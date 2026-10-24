@@ -174,11 +174,9 @@ def ask_gemma(
                 if not text:
                     raise _EmptyResponse()
                 return Answer(text=text, model=model, attempts=attempts)
-            except Exception as exc:  # noqa: BLE001 - classified just below
+            except Exception as exc:
                 last_error = exc
                 if _error_code(exc) == 404:
-                    # This key can't see this model. Retrying won't change that,
-                    # but the next model in the list might work.
                     log.warning("%s not found for this key, trying next model", model)
                     break
                 if not _is_transient(exc):
