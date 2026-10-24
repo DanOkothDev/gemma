@@ -8,7 +8,15 @@ errors that retrying can't fix surface immediately.
 
 import pytest
 
-from app.gemma import Answer, GemmaUnavailable, Settings, ask_gemma, load_system_prompt
+from app.gemma import (
+    Answer,
+    GemmaUnavailable,
+    Settings,
+    ask_gemma,
+    ensure_structured_data,
+    load_system_prompt,
+    parse_json_payload,
+)
 
 
 class FakeAPIError(Exception):
@@ -44,7 +52,7 @@ class FakeClient:
 
     def upload(self, *, file):
         self.uploads.append(file)
-        return "uploaded-file-handle"
+        return f"uploaded-{file}"
 
 
 @pytest.fixture
@@ -120,7 +128,7 @@ def test_empty_response_counts_as_a_failed_attempt(settings, sleeps):
 
 
 def test_timeout_style_errors_are_retried(settings, sleeps):
-    class ReadTimeout(Exception):  # name-matched, like httpx's
+    class ReadTimeout(Exception):
         pass
 
     client = FakeClient([ReadTimeout("slow"), "ok"])
@@ -140,7 +148,6 @@ def test_backoff_doubles_between_retries(sleeps):
     settings = Settings(models=("m1",), retries_per_model=3, base_delay_s=1.0)
     client = FakeClient([FakeAPIError(503), FakeAPIError(503), "ok"])
     run(client, settings, sleeps)
-    # delay = base * 2**(attempt-1) plus up to base/2 of jitter
     assert 1.0 <= sleeps[0] < 1.5
     assert 2.0 <= sleeps[1] < 2.5
 
@@ -157,3 +164,42 @@ def test_settings_default_models_when_env_unset(monkeypatch):
 
 def test_system_prompt_file_is_present_and_nonempty():
     assert load_system_prompt()
+
+
+def test_parse_json_payload_markdown_and_raw():
+    raw_json = '{"safety_score": "SAFE", "headline": "All clear"}'
+    assert parse_json_payload(raw_json) == {"safety_score": "SAFE", "headline": "All clear"}
+
+    markdown_json = '```json\n{"safety_score": "DANGER", "headline": "Overdose risk"}\n```'
+    assert parse_json_payload(markdown_json) == {"safety_score": "DANGER", "headline": "Overdose risk"}
+
+    assert parse_json_payload("not json") is None
+
+
+def test_structured_answer_contains_data(settings, sleeps):
+    json_text = '{"safety_score": "CAUTION", "headline": "Take with food"}'
+    client = FakeClient([json_text])
+    answer = run(client, settings, sleeps)
+    assert answer.data == {"safety_score": "CAUTION", "headline": "Take with food"}
+    assert answer.model == "m1"
+
+
+def test_multi_image_upload_to_client(settings, sleeps, tmp_path):
+    img1 = tmp_path / "bottle1.jpg"
+    img2 = tmp_path / "bottle2.png"
+    img1.write_bytes(b"image 1")
+    img2.write_bytes(b"image 2")
+    client = FakeClient(["ok"])
+    answer = run(client, settings, sleeps, image=[img1, img2])
+    assert answer.attempts == 1
+    assert client.uploads == [str(img1), str(img2)]
+
+
+def test_ensure_structured_data_fallback():
+    data_danger = ensure_structured_data("Warning: dangerous duplicate acetaminophen detected!")
+    assert data_danger["safety_score"] == "DANGER"
+    assert "daily_schedule" in data_danger
+    assert "emergency_card" in data_danger
+
+    data_caution = ensure_structured_data("Please avoid eating with high-fat meals.")
+    assert data_caution["safety_score"] == "CAUTION"

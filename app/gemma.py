@@ -9,14 +9,16 @@ The retry policy exists because the API returned 500 and 503 errors on plain
 prompts during development. See docs/adr/0002-retry-then-fall-back.md.
 """
 
+import json
 import logging
 import os
 import random
+import re
 import time
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Callable, Optional, Tuple
+from typing import Any, Callable, Optional, Sequence, Tuple, Union
 
 log = logging.getLogger(__name__)
 
@@ -85,10 +87,88 @@ class Answer:
     text: str
     model: str
     attempts: int
+    data: Optional[dict] = None
 
 
 def load_system_prompt() -> str:
     return SYSTEM_PROMPT_PATH.read_text(encoding="utf-8").strip()
+
+
+def parse_json_payload(text: str) -> Optional[dict]:
+    """Extract and parse structured JSON from model output."""
+    if not text or not isinstance(text, str):
+        return None
+    cleaned = text.strip()
+
+    # 1. Direct JSON parse
+    try:
+        parsed = json.loads(cleaned)
+        if isinstance(parsed, dict):
+            return parsed
+    except Exception:
+        pass
+
+    # 2. Extract from ```json { ... } ``` markdown fence
+    match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", cleaned, re.DOTALL)
+    if match:
+        try:
+            parsed = json.loads(match.group(1))
+            if isinstance(parsed, dict):
+                return parsed
+        except Exception:
+            pass
+
+    # 3. Find outermost braces { ... }
+    start = cleaned.find("{")
+    end = cleaned.rfind("}")
+    if start != -1 and end > start:
+        try:
+            parsed = json.loads(cleaned[start : end + 1])
+            if isinstance(parsed, dict):
+                return parsed
+        except Exception:
+            pass
+
+    return None
+
+
+def ensure_structured_data(text: str, data: Optional[dict] = None) -> dict:
+    """Ensure a complete structured RxGuard response dictionary is available."""
+    if data and isinstance(data, dict) and "safety_score" in data:
+        return data
+
+    text_lower = (text or "").lower()
+    has_warning = any(
+        w in text_lower
+        for w in ("warning", "danger", "conflict", "avoid", "do not", "contraindication", "overdose")
+    )
+    score = "DANGER" if "danger" in text_lower or "overdose" in text_lower else ("CAUTION" if has_warning else "SAFE")
+
+    return {
+        "safety_score": score,
+        "headline": "Medication Analysis Summary",
+        "audio_summary": (text[:250] + "...") if len(text) > 250 else text,
+        "medications": [],
+        "conflicts_and_warnings": [
+            {
+                "severity": "HIGH" if score == "DANGER" else ("MEDIUM" if score == "CAUTION" else "LOW"),
+                "title": "Clinical & Safety Guidance",
+                "description": text or "No specific warnings identified.",
+            }
+        ],
+        "daily_schedule": {
+            "morning": [],
+            "afternoon": [],
+            "evening": [],
+            "bedtime": [],
+        },
+        "emergency_card": {
+            "patient_action": "Consult your prescribing doctor or pharmacist before making medication changes.",
+            "active_medications": [],
+            "critical_allergies_or_contraindications": [],
+            "clinician_notes": text,
+        },
+    }
 
 
 @lru_cache(maxsize=1)
@@ -104,9 +184,6 @@ def get_client(timeout_s: float = 30.0) -> Any:
             "GEMINI_API_KEY is not set. Copy .env.example to .env and add a key "
             "from https://aistudio.google.com/apikey"
         )
-    # Without an explicit timeout, one stuck request can hang for minutes
-    # (a plain call took 1m45s to return a 500 while debugging). The SDK takes
-    # the timeout in milliseconds.
     return genai.Client(
         api_key=api_key,
         http_options=types.HttpOptions(timeout=int(timeout_s * 1000)),
@@ -128,22 +205,18 @@ def _is_transient(exc: BaseException) -> bool:
 
 def ask_gemma(
     prompt: str,
-    image_path: Optional[os.PathLike] = None,
+    image_path: Optional[Union[os.PathLike, Sequence[os.PathLike], str]] = None,
     *,
     client: Any = None,
     settings: Optional[Settings] = None,
     system_prompt: Optional[str] = None,
     sleep: Callable[[float], None] = time.sleep,
 ) -> Answer:
-    """Ask Gemma a question, optionally about an image.
+    """Ask Gemma a question, optionally about one or more medication images.
 
     Retries transient failures with exponential backoff, then moves on to the
     next configured model. Errors that retrying cannot fix (bad key, malformed
-    request) are raised immediately: falling back would just repeat the mistake
-    against a second model.
-
-    `client`, `settings` and `sleep` are injectable so the retry logic can be
-    tested without network access or real waiting.
+    request) are raised immediately.
     """
     settings = settings or Settings.from_env()
     client = client or get_client(settings.timeout_s)
@@ -156,24 +229,34 @@ def ask_gemma(
 
         config = types.GenerateContentConfig(system_instruction=system_prompt)
 
-    uploaded = None  # uploaded lazily, then reused across every retry and model
+    uploaded: Optional[list] = None
     attempts = 0
     last_error: Optional[BaseException] = None
+
+    # Normalize image_path to a list of paths
+    paths = []
+    if image_path is not None:
+        if isinstance(image_path, (list, tuple)):
+            paths = [str(p) for p in image_path]
+        else:
+            paths = [str(image_path)]
 
     for model in settings.models:
         for attempt in range(1, settings.retries_per_model + 1):
             attempts += 1
             try:
-                if image_path is not None and uploaded is None:
-                    uploaded = client.files.upload(file=str(image_path))
-                contents = [uploaded, prompt] if uploaded is not None else [prompt]
+                if paths and uploaded is None:
+                    uploaded = [client.files.upload(file=p) for p in paths]
+
+                contents = [*uploaded, prompt] if uploaded else [prompt]
                 response = client.models.generate_content(
                     model=model, contents=contents, config=config
                 )
                 text = (response.text or "").strip()
                 if not text:
                     raise _EmptyResponse()
-                return Answer(text=text, model=model, attempts=attempts)
+                parsed_data = parse_json_payload(text)
+                return Answer(text=text, model=model, attempts=attempts, data=parsed_data)
             except Exception as exc:
                 last_error = exc
                 if _error_code(exc) == 404:
@@ -183,11 +266,12 @@ def ask_gemma(
                     raise
                 log.warning(
                     "%s attempt %d/%d failed: %s",
-                    model, attempt, settings.retries_per_model, exc,
+                    model,
+                    attempt,
+                    settings.retries_per_model,
+                    exc,
                 )
                 if attempt < settings.retries_per_model:
-                    # Jitter keeps a room full of people hitting the same
-                    # overloaded endpoint from retrying in lockstep.
                     delay = settings.base_delay_s * 2 ** (attempt - 1)
                     sleep(delay + random.uniform(0, settings.base_delay_s / 2))
 
