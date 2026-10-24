@@ -1,1508 +1,522 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>RxGuard — Visual Medication Safety & Conflict Copilot</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #0b0f19;
-      --card-bg: #131b2e;
-      --card-border: #1e293b;
-      --fg: #f8fafc;
-      --fg-muted: #94a3b8;
-      --accent: #38bdf8;
-      --accent-hover: #0284c7;
-      --danger: #ef4444;
-      --danger-bg: rgba(239, 68, 68, 0.12);
-      --danger-border: rgba(239, 68, 68, 0.3);
-      --warning: #f59e0b;
-      --warning-bg: rgba(245, 158, 11, 0.12);
-      --warning-border: rgba(245, 158, 11, 0.3);
-      --success: #10b981;
-      --success-bg: rgba(16, 185, 129, 0.12);
-      --success-border: rgba(16, 185, 129, 0.3);
-      --radius: 12px;
-      --font-scale: 16px;
-    }
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RxGuard: medication safety check</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f7f6;--surface:#fff;--ink:#0e2420;--muted:#586c67;--line:#dae3e0;
+  --brand:#0f766e;--brand-ink:#fff;--soft:#e7f1ee;
+  --danger:#c2362b;--danger-bg:#fcebe9;--warn:#a96a0a;--warn-bg:#fdf3df;--ok:#0f7a4f;--ok-bg:#e4f4ec;
+  --fs:16px;--r:14px;
+  --display:'Bricolage Grotesque',system-ui,sans-serif;--body:'Hanken Grotesk',system-ui,sans-serif;
+}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --bg:#0a1210;--surface:#111c19;--ink:#e8f1ee;--muted:#93a9a3;--line:#223530;
+  --brand:#2dd4bf;--brand-ink:#052a25;--soft:#152824;
+  --danger:#f2766b;--danger-bg:#2c1614;--warn:#e6b04f;--warn-bg:#2a2010;--ok:#4cc38a;--ok-bg:#112a1f;}}
+body.senior{--fs:19px;--muted:var(--ink);--line:color-mix(in srgb,var(--ink) 35%,transparent)}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font:400 var(--fs)/1.6 var(--body);background:var(--bg);color:var(--ink);min-height:100vh}
+button,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+.wrap{max-width:1040px;margin:0 auto;padding:0 1.5rem}
 
-    body.senior-mode {
-      --font-scale: 19px;
-      --bg: #030712;
-      --card-bg: #111827;
-      --card-border: #374151;
-      --fg: #ffffff;
-      --fg-muted: #cbd5e1;
-    }
+/* header */
+header{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 85%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:center;justify-content:space-between;height:60px;gap:1rem}
+.brand{font:800 1.25rem var(--display);letter-spacing:-.02em;display:flex;align-items:center;gap:.6rem}
+.mark{width:28px;height:28px;border-radius:50%;background:linear-gradient(90deg,var(--brand) 50%,var(--soft) 50%);border:2px solid var(--brand);transform:rotate(-35deg)}
+.nav{display:flex;gap:.5rem}
+.btn{border:1px solid var(--line);background:var(--surface);padding:.45rem .9rem;border-radius:999px;font-weight:600;font-size:.85rem;cursor:pointer;transition:border-color .2s,background .2s,transform .2s}
+.btn:hover{border-color:var(--brand)}
+.btn:active{transform:scale(.97)}
+.btn.on{background:var(--soft);border-color:var(--brand);color:var(--brand)}
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-      font-size: var(--font-scale);
-      background: var(--bg);
-      color: var(--fg);
-      line-height: 1.6;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
+/* hero */
+.hero{padding:4rem 0 2rem;max-width:720px}
+.hero h1{font:800 clamp(2.2rem,6vw,3.6rem)/1.05 var(--display);letter-spacing:-.035em;margin-bottom:1rem}
+.hero p{color:var(--muted);font-size:1.1rem;max-width:56ch}
+.hero h1 span{display:inline-block;opacity:0;transform:translateY(.4em);animation:rise .7s cubic-bezier(.2,.7,.2,1) forwards}
+.hero h1 span:nth-child(2){animation-delay:.12s}.hero h1 span:nth-child(3){animation-delay:.24s}
+@keyframes rise{to{opacity:1;transform:none}}
 
-    header {
-      border-bottom: 1px solid var(--card-border);
-      background: rgba(11, 15, 25, 0.8);
-      backdrop-filter: blur(12px);
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      padding: 0.85rem 1.5rem;
-    }
+/* checker */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:1.5rem;margin-bottom:2.5rem}
+.field{margin-bottom:1.25rem}
+.field>label,.lbl{display:block;font-weight:700;font-size:.92rem;margin-bottom:.5rem}
+.drop{position:relative;border:1.5px dashed var(--line);border-radius:12px;padding:1.75rem 1rem;text-align:center;overflow:hidden;transition:border-color .25s,background .25s}
+.drop:hover,.drop.dragover{border-color:var(--brand);background:var(--soft)}
+.drop svg{width:28px;height:28px;stroke:var(--brand);margin-bottom:.4rem}
+.drop strong{display:block;font-size:.95rem}
+.drop small{color:var(--muted);font-size:.8rem}
+.drop input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.drop::after{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:var(--brand);box-shadow:0 0 14px var(--brand);opacity:0}
+body.busy .drop::after{opacity:1;animation:scan 1.6s ease-in-out infinite alternate}
+@keyframes scan{from{top:0}to{top:calc(100% - 2px)}}
+.thumbs{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:.9rem}
+.thumb{position:relative;width:80px;height:80px;border-radius:10px;overflow:hidden;border:1px solid var(--line);animation:pop .25s ease-out}
+@keyframes pop{from{transform:scale(.85);opacity:0}}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.thumb button{position:absolute;top:4px;right:4px;width:22px;height:22px;border:0;border-radius:50%;background:rgba(0,0,0,.65);color:#fff;cursor:pointer;line-height:1}
+textarea{width:100%;min-height:5.5rem;padding:.8rem 1rem;background:var(--bg);border:1px solid var(--line);border-radius:10px;resize:vertical;transition:border-color .2s}
+textarea:focus{outline:none;border-color:var(--brand)}
+.examples{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.6rem;font-size:.82rem;color:var(--muted)}
+.chip{border:1px solid var(--line);background:transparent;border-radius:999px;padding:.25rem .75rem;font-size:.8rem;cursor:pointer;transition:all .2s}
+.chip:hover{border-color:var(--brand);color:var(--brand)}
+.engine{display:flex;flex-wrap:wrap;gap:.5rem}
+.engine label{display:flex;align-items:center;gap:.5rem;border:1px solid var(--line);border-radius:10px;padding:.5rem .9rem;font-size:.88rem;font-weight:600;cursor:pointer;margin:0;transition:all .2s}
+.engine label:has(input:checked){border-color:var(--brand);background:var(--soft)}
+.engine input{accent-color:var(--brand)}
+.actions{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-top:1.5rem}
+.link{background:none;border:0;color:var(--brand);font-weight:700;cursor:pointer;padding:.5rem 0}
+.link:hover{text-decoration:underline}
+.go{background:var(--brand);color:var(--brand-ink);border:0;padding:.8rem 1.6rem;border-radius:999px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:.6rem;transition:transform .2s,filter .2s}
+.go:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.go:disabled{opacity:.7;cursor:wait}
+.spin{display:none;width:16px;height:16px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:rot .7s linear infinite}
+.go:disabled .spin{display:inline-block}
+@keyframes rot{to{transform:rotate(360deg)}}
+#status-card{display:none;margin:-1.25rem 0 2rem;color:var(--muted);font-size:.92rem}
+#status-card::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--brand);margin-right:.6rem;animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.25}}
 
-    .nav-container {
-      max-width: 1100px;
-      margin: 0 auto;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
+/* results */
+#results-section{display:none}
+#results-section.show>*{animation:rise .5s cubic-bezier(.2,.7,.2,1) both}
+#results-section.show>*:nth-child(2){animation-delay:.08s}
+#results-section.show>*:nth-child(n+3){animation-delay:.16s}
+.banner{display:flex;gap:1.25rem;align-items:flex-start;padding:1.5rem;border-radius:var(--r);border:1px solid;margin-bottom:1.25rem}
+.banner .ring{flex:none;width:46px;height:46px;border-radius:50%;border:3px solid currentColor;display:grid;place-items:center;font:800 1.3rem var(--display)}
+.banner.safe{background:var(--ok-bg);color:var(--ok);border-color:color-mix(in srgb,var(--ok) 35%,transparent)}
+.banner.warning{background:var(--warn-bg);color:var(--warn);border-color:color-mix(in srgb,var(--warn) 35%,transparent)}
+.banner.danger{background:var(--danger-bg);color:var(--danger);border-color:color-mix(in srgb,var(--danger) 35%,transparent)}
+.banner.danger .ring{animation:ping 1.8s ease-out infinite}
+@keyframes ping{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--danger) 45%,transparent)}100%{box-shadow:0 0 0 16px transparent}}
+.banner h2{font:700 1.4rem/1.25 var(--display);letter-spacing:-.02em;margin:.1rem 0 .35rem}
+.banner p{color:var(--ink);opacity:.85;font-size:.95rem}
+.banner .tag{font-weight:700;font-size:.8rem}
+.voice{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:1rem 1.25rem;margin-bottom:2.25rem}
+.voice h4{font-size:.95rem}.voice p{font-size:.82rem;color:var(--muted)}
+.voice-btns{display:flex;gap:.5rem}
+#btn-play-voice.playing{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+h3.sec{font:700 1.2rem var(--display);letter-spacing:-.015em;margin:0 0 .9rem}
+.list{display:flex;flex-direction:column;gap:.7rem;margin-bottom:2.25rem}
+.conflict{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--muted);border-radius:10px;padding:1rem 1.2rem}
+.conflict.high{border-left-color:var(--danger)}.conflict.medium{border-left-color:var(--warn)}.conflict.low{border-left-color:var(--ok)}
+.conflict-h{display:flex;justify-content:space-between;gap:1rem;align-items:center;margin-bottom:.3rem}
+.conflict-h b{font-size:1rem}
+.sev{font-size:.75rem;font-weight:700;padding:.15rem .55rem;border-radius:999px;white-space:nowrap}
+.sev.high{background:var(--danger-bg);color:var(--danger)}.sev.medium{background:var(--warn-bg);color:var(--warn)}.sev.low{background:var(--ok-bg);color:var(--ok)}
+.conflict p{color:var(--muted);font-size:.9rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:.9rem;margin-bottom:2.25rem}
+.med{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1.2rem;transition:border-color .2s,transform .2s}
+.med:hover{border-color:var(--brand);transform:translateY(-2px)}
+.med-h{display:flex;justify-content:space-between;gap:.75rem;align-items:baseline}
+.med-n{font:700 1.1rem var(--display)}
+.med-d{font-size:.8rem;font-weight:700;color:var(--brand);background:var(--soft);padding:.15rem .6rem;border-radius:999px;white-space:nowrap}
+.med-g{font-size:.85rem;color:var(--muted);margin:.1rem 0 .7rem}
+.med-p{font-size:.86rem;margin-bottom:.25rem}
+.med-w{display:block;font-size:.8rem;color:var(--warn);margin-top:.3rem}
+.day{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:0;margin-bottom:2.25rem;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--surface)}
+.slot{padding:1.1rem 1.2rem;border-right:1px solid var(--line);border-bottom:1px solid var(--line);margin:0 -1px -1px 0}
+.slot h4{font-size:.95rem;margin-bottom:.1rem}
+.slot time{display:block;font-size:.78rem;color:var(--muted);margin-bottom:.7rem}
+.slot ul{list-style:none;display:flex;flex-direction:column;gap:.45rem}
+.slot li{background:var(--soft);border-radius:8px;padding:.5rem .7rem;font-size:.84rem;line-height:1.4}
+.slot li.none{background:none;padding:0;color:var(--muted);font-style:italic}
+.cta{display:flex;flex-wrap:wrap;gap:.7rem;margin-bottom:1.5rem}
+.cta .btn{padding:.7rem 1.2rem;font-size:.92rem}
+.cta .main{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.meta{display:flex;justify-content:space-between;flex-wrap:wrap;gap:.5rem;border-top:1px solid var(--line);padding-top:1rem;font-size:.8rem;color:var(--muted)}
+footer{padding:2rem 0 3rem}
 
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      text-decoration: none;
-      color: inherit;
-    }
+/* modals */
+.overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(5,12,10,.6);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:1.25rem}
+.overlay.open{display:flex}
+.overlay.open .modal{animation:modal .25s cubic-bezier(.2,.8,.3,1)}
+@keyframes modal{from{opacity:0;transform:translateY(14px) scale(.98)}}
+.modal{background:var(--surface);color:var(--ink);width:100%;max-width:620px;max-height:90vh;overflow:auto;border-radius:var(--r);padding:1.75rem}
+.modal-h{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding-bottom:.9rem;margin-bottom:1.2rem}
+.modal-h h3{font:700 1.2rem var(--display)}
+.x{background:none;border:0;font-size:1.6rem;line-height:1;cursor:pointer;color:var(--muted)}
+.mf{margin-bottom:1rem}.mf .lbl{font-size:.75rem;color:var(--muted);margin-bottom:.15rem}.mf p{font-size:.95rem}
+.em .mf:first-of-type p{font-weight:700;color:var(--danger)}
+.code{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:.7rem .9rem;font:.78rem ui-monospace,Menlo,monospace;overflow-x:auto;white-space:nowrap}
+.opt{border:1px solid var(--line);border-radius:10px;padding:1rem;margin-bottom:.9rem}
+.opt b{display:block;margin-bottom:.25rem}.opt p{font-size:.85rem;color:var(--muted);margin-bottom:.7rem}
+.mfoot{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-top:1.25rem;font-size:.82rem;color:var(--ok)}
+.print{background:var(--ink);color:var(--bg);border:0;padding:.6rem 1.2rem;border-radius:999px;font-weight:700;cursor:pointer}
 
-    .brand-icon {
-      width: 36px;
-      height: 36px;
-      background: linear-gradient(135deg, #38bdf8 0%, #3b82f6 100%);
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.2rem;
-      font-weight: 800;
-      color: #fff;
-      box-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
-    }
-
-    .brand-title {
-      font-weight: 800;
-      font-size: 1.25rem;
-      letter-spacing: -0.02em;
-    }
-
-    .brand-badge {
-      font-size: 0.7rem;
-      font-weight: 600;
-      padding: 0.2rem 0.5rem;
-      border-radius: 999px;
-      background: rgba(56, 189, 248, 0.15);
-      color: var(--accent);
-      border: 1px solid rgba(56, 189, 248, 0.3);
-    }
-
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-
-    .btn-toggle {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      color: var(--fg);
-      padding: 0.4rem 0.85rem;
-      border-radius: 8px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      transition: all 0.2s;
-    }
-    .btn-toggle:hover {
-      border-color: var(--accent);
-    }
-    .btn-toggle.active {
-      background: rgba(56, 189, 248, 0.2);
-      border-color: var(--accent);
-      color: var(--accent);
-    }
-
-    main {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 2rem 1.5rem 5rem;
-      width: 100%;
-      flex: 1;
-    }
-
-    .hero {
-      text-align: center;
-      margin-bottom: 2.25rem;
-    }
-    .hero h1 {
-      font-size: clamp(1.8rem, 4vw, 2.7rem);
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      line-height: 1.2;
-      margin-bottom: 0.75rem;
-      background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    .hero p {
-      color: var(--fg-muted);
-      max-width: 680px;
-      margin: 0 auto;
-      font-size: 1.05rem;
-    }
-
-    /* Demo Presets */
-    .presets-box {
-      background: rgba(19, 27, 46, 0.6);
-      border: 1px solid var(--card-border);
-      border-radius: var(--radius);
-      padding: 1rem 1.25rem;
-      margin-bottom: 2rem;
-    }
-    .presets-label {
-      font-size: 0.8rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--fg-muted);
-      margin-bottom: 0.75rem;
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-    .presets-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 0.75rem;
-    }
-    .preset-chip {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 8px;
-      padding: 0.75rem 1rem;
-      text-align: left;
-      cursor: pointer;
-      color: inherit;
-      transition: all 0.2s;
-    }
-    .preset-chip:hover {
-      border-color: var(--accent);
-      transform: translateY(-2px);
-    }
-    .preset-title {
-      font-weight: 700;
-      font-size: 0.9rem;
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      margin-bottom: 0.25rem;
-    }
-    .preset-desc {
-      font-size: 0.78rem;
-      color: var(--fg-muted);
-      line-height: 1.4;
-    }
-
-    /* Input Card */
-    .input-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: var(--radius);
-      padding: 1.75rem;
-      margin-bottom: 2.5rem;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-    }
-
-    .form-group {
-      margin-bottom: 1.25rem;
-    }
-    label {
-      display: block;
-      font-weight: 700;
-      font-size: 0.95rem;
-      margin-bottom: 0.5rem;
-      color: var(--fg);
-    }
-
-    .dropzone {
-      border: 2px dashed var(--card-border);
-      border-radius: 10px;
-      padding: 2rem 1.5rem;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.2s;
-      background: rgba(11, 15, 25, 0.4);
-      position: relative;
-    }
-    .dropzone:hover, .dropzone.dragover {
-      border-color: var(--accent);
-      background: rgba(56, 189, 248, 0.05);
-    }
-    .dropzone-icon {
-      font-size: 2.2rem;
-      margin-bottom: 0.5rem;
-    }
-    .dropzone-text {
-      font-size: 0.95rem;
-      font-weight: 600;
-      color: var(--fg);
-      margin-bottom: 0.25rem;
-    }
-    .dropzone-subtext {
-      font-size: 0.8rem;
-      color: var(--fg-muted);
-    }
-    input[type="file"] {
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      opacity: 0;
-      cursor: pointer;
-    }
-
-    /* Thumbnail previews */
-    .thumbnails-grid {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.75rem;
-      margin-top: 1rem;
-    }
-    .thumb-wrap {
-      position: relative;
-      width: 90px;
-      height: 90px;
-      border-radius: 8px;
-      overflow: hidden;
-      border: 1px solid var(--card-border);
-    }
-    .thumb-wrap img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-    .thumb-remove {
-      position: absolute;
-      top: 3px;
-      right: 3px;
-      background: rgba(0, 0, 0, 0.7);
-      color: #fff;
-      border: 0;
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      font-size: 0.7rem;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    textarea {
-      width: 100%;
-      min-height: 5.5rem;
-      padding: 0.85rem 1rem;
-      background: rgba(11, 15, 25, 0.6);
-      border: 1px solid var(--card-border);
-      border-radius: 8px;
-      color: inherit;
-      font-family: inherit;
-      font-size: 0.95rem;
-      line-height: 1.5;
-      resize: vertical;
-      transition: border-color 0.2s;
-    }
-    textarea:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
-
-    .form-actions {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 1.5rem;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-    .camera-trigger {
-      background: transparent;
-      border: 1px solid var(--card-border);
-      color: var(--fg);
-      padding: 0.65rem 1.1rem;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 0.9rem;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      transition: all 0.2s;
-    }
-    .camera-trigger:hover {
-      border-color: var(--accent);
-      color: var(--accent);
-    }
-
-    .btn-submit {
-      background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
-      color: #ffffff;
-      border: none;
-      padding: 0.75rem 1.8rem;
-      border-radius: 8px;
-      font-weight: 700;
-      font-size: 1rem;
-      cursor: pointer;
-      box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
-      display: inline-flex;
-      align-items: center;
-      gap: 0.6rem;
-      transition: all 0.2s;
-    }
-    .btn-submit:hover:not(:disabled) {
-      filter: brightness(1.1);
-      transform: translateY(-1px);
-    }
-    .btn-submit:disabled {
-      opacity: 0.6;
-      cursor: wait;
-      box-shadow: none;
-    }
-
-    /* Loading Spinner */
-    .spinner {
-      width: 18px;
-      height: 18px;
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      border-top-color: #fff;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    /* Results Dashboard */
-    #results-section {
-      display: none;
-      animation: fadeIn 0.4s ease-out;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* Safety Banner */
-    .safety-banner {
-      border-radius: var(--radius);
-      padding: 1.5rem 1.75rem;
-      margin-bottom: 2rem;
-      display: flex;
-      align-items: flex-start;
-      gap: 1.25rem;
-      border: 1px solid transparent;
-    }
-    .safety-banner.danger {
-      background: var(--danger-bg);
-      border-color: var(--danger-border);
-      color: #fca5a5;
-    }
-    .safety-banner.danger .banner-title { color: #ef4444; }
-    .safety-banner.warning {
-      background: var(--warning-bg);
-      border-color: var(--warning-border);
-      color: #fde68a;
-    }
-    .safety-banner.warning .banner-title { color: #f59e0b; }
-    .safety-banner.safe {
-      background: var(--success-bg);
-      border-color: var(--success-border);
-      color: #a7f3d0;
-    }
-    .safety-banner.safe .banner-title { color: #10b981; }
-
-    .banner-icon {
-      font-size: 2.2rem;
-      line-height: 1;
-    }
-    .banner-content {
-      flex: 1;
-    }
-    .banner-badge {
-      display: inline-block;
-      font-size: 0.75rem;
-      font-weight: 800;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      padding: 0.2rem 0.6rem;
-      border-radius: 4px;
-      margin-bottom: 0.4rem;
-      background: rgba(0, 0, 0, 0.2);
-    }
-    .banner-title {
-      font-size: 1.35rem;
-      font-weight: 800;
-      margin-bottom: 0.35rem;
-      line-height: 1.3;
-    }
-    .banner-desc {
-      font-size: 0.95rem;
-      opacity: 0.9;
-    }
-
-    /* Grandma Voice Audio Player */
-    .audio-player-card {
-      background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.8) 100%);
-      border: 1px solid var(--card-border);
-      border-radius: var(--radius);
-      padding: 1.25rem 1.5rem;
-      margin-bottom: 2rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1.25rem;
-      flex-wrap: wrap;
-    }
-    .audio-info {
-      display: flex;
-      align-items: center;
-      gap: 0.85rem;
-    }
-    .audio-pulse {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      background: rgba(56, 189, 248, 0.15);
-      color: var(--accent);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.3rem;
-      border: 1px solid rgba(56, 189, 248, 0.3);
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .audio-pulse:hover {
-      background: var(--accent);
-      color: #fff;
-    }
-    .audio-pulse.playing {
-      animation: pulse 1.2s infinite;
-      background: var(--accent);
-      color: #fff;
-    }
-    @keyframes pulse {
-      0% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.6); }
-      70% { box-shadow: 0 0 0 14px rgba(56, 189, 248, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
-    }
-    .audio-text h4 {
-      font-size: 0.95rem;
-      font-weight: 700;
-    }
-    .audio-text p {
-      font-size: 0.82rem;
-      color: var(--fg-muted);
-    }
-    .audio-controls {
-      display: flex;
-      gap: 0.5rem;
-    }
-    .btn-audio {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      color: var(--fg);
-      padding: 0.45rem 1rem;
-      border-radius: 6px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-    .btn-audio:hover {
-      border-color: var(--accent);
-    }
-
-    /* Section Headers */
-    .section-title {
-      font-size: 1.15rem;
-      font-weight: 800;
-      letter-spacing: -0.01em;
-      margin-bottom: 1rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    /* Conflicts Grid */
-    .conflicts-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-      margin-bottom: 2rem;
-    }
-    .conflict-item {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 10px;
-      padding: 1.1rem 1.25rem;
-      border-left: 4px solid var(--accent);
-    }
-    .conflict-item.high {
-      border-left-color: var(--danger);
-      background: rgba(239, 68, 68, 0.05);
-    }
-    .conflict-item.medium {
-      border-left-color: var(--warning);
-      background: rgba(245, 158, 11, 0.05);
-    }
-    .conflict-item.low {
-      border-left-color: var(--success);
-      background: rgba(16, 185, 129, 0.05);
-    }
-    .conflict-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 0.4rem;
-    }
-    .conflict-name {
-      font-weight: 700;
-      font-size: 1rem;
-    }
-    .conflict-badge {
-      font-size: 0.7rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
-    }
-    .conflict-badge.high { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border); }
-    .conflict-badge.medium { background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning-border); }
-    .conflict-badge.low { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); }
-    .conflict-desc {
-      font-size: 0.9rem;
-      color: var(--fg-muted);
-      line-height: 1.5;
-    }
-
-    /* Medications Grid */
-    .medications-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 1rem;
-      margin-bottom: 2rem;
-    }
-    .med-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 10px;
-      padding: 1.25rem;
-      transition: all 0.2s;
-    }
-    .med-card:hover {
-      border-color: rgba(56, 189, 248, 0.4);
-    }
-    .med-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 0.5rem;
-    }
-    .med-name {
-      font-size: 1.1rem;
-      font-weight: 800;
-      color: #fff;
-    }
-    .med-dose {
-      font-size: 0.8rem;
-      font-weight: 700;
-      color: var(--accent);
-      background: rgba(56, 189, 248, 0.1);
-      padding: 0.2rem 0.6rem;
-      border-radius: 4px;
-    }
-    .med-generic {
-      font-size: 0.85rem;
-      color: var(--fg-muted);
-      margin-bottom: 0.75rem;
-    }
-    .med-prop {
-      font-size: 0.85rem;
-      margin-bottom: 0.35rem;
-    }
-    .med-prop strong {
-      color: var(--fg);
-    }
-
-    /* Pillbox 24h Schedule */
-    .schedule-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 1rem;
-      margin-bottom: 2rem;
-    }
-    .schedule-slot {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 10px;
-      padding: 1.15rem;
-    }
-    .slot-header {
-      font-weight: 700;
-      font-size: 0.95rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding-bottom: 0.75rem;
-      margin-bottom: 0.75rem;
-      border-bottom: 1px solid var(--card-border);
-      color: var(--accent);
-    }
-    .slot-items {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-    .slot-pill {
-      background: rgba(11, 15, 25, 0.6);
-      border: 1px solid var(--card-border);
-      border-radius: 6px;
-      padding: 0.6rem 0.75rem;
-      font-size: 0.82rem;
-      line-height: 1.4;
-    }
-    .slot-empty {
-      font-size: 0.8rem;
-      color: var(--fg-muted);
-      font-style: italic;
-    }
-
-    /* Actions Bar */
-    .dashboard-actions {
-      display: flex;
-      gap: 1rem;
-      flex-wrap: wrap;
-      margin-top: 1.5rem;
-      margin-bottom: 2rem;
-    }
-    .btn-action {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      color: var(--fg);
-      padding: 0.75rem 1.4rem;
-      border-radius: 8px;
-      font-weight: 700;
-      font-size: 0.95rem;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.6rem;
-      transition: all 0.2s;
-    }
-    .btn-action:hover {
-      border-color: var(--accent);
-      color: var(--accent);
-      transform: translateY(-1px);
-    }
-    .btn-action.primary {
-      background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
-      color: #fff;
-      border: none;
-    }
-    .btn-action.primary:hover {
-      filter: brightness(1.1);
-      color: #fff;
-    }
-
-    /* Emergency Card Modal */
-    .modal-overlay {
-      display: none;
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0, 0, 0, 0.75);
-      backdrop-filter: blur(8px);
-      z-index: 1000;
-      align-items: center;
-      justify-content: center;
-      padding: 1.5rem;
-    }
-    .modal-overlay.open {
-      display: flex;
-    }
-    .emergency-modal {
-      background: #ffffff;
-      color: #111827;
-      max-width: 600px;
-      width: 100%;
-      border-radius: 14px;
-      padding: 2rem;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-      position: relative;
-    }
-    .emergency-header {
-      border-bottom: 2px solid #ef4444;
-      padding-bottom: 1rem;
-      margin-bottom: 1.25rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .emergency-title {
-      color: #b91c1c;
-      font-size: 1.3rem;
-      font-weight: 800;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    .emergency-close {
-      background: transparent;
-      border: 0;
-      font-size: 1.5rem;
-      cursor: pointer;
-      color: #6b7280;
-    }
-    .emergency-field {
-      margin-bottom: 1rem;
-    }
-    .emergency-field label {
-      color: #6b7280;
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      font-weight: 800;
-      margin-bottom: 0.2rem;
-    }
-    .emergency-field p {
-      font-size: 0.95rem;
-      color: #111827;
-      line-height: 1.4;
-    }
-    .emergency-actions {
-      display: flex;
-      gap: 0.75rem;
-      margin-top: 1.5rem;
-      justify-content: flex-end;
-    }
-    .btn-modal {
-      padding: 0.6rem 1.2rem;
-      border-radius: 6px;
-      font-weight: 700;
-      font-size: 0.9rem;
-      cursor: pointer;
-    }
-    .btn-modal.print {
-      background: #111827;
-      color: #fff;
-      border: none;
-    }
-
-    /* Model metadata footer */
-    .meta-bar {
-      margin-top: 2rem;
-      padding-top: 1rem;
-      border-top: 1px solid var(--card-border);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.8rem;
-      color: var(--fg-muted);
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-
-    /* Print styles */
-    @media print {
-      body * { visibility: hidden; }
-      .emergency-modal, .emergency-modal * { visibility: visible; }
-      .emergency-modal {
-        position: absolute;
-        left: 0; top: 0; width: 100%;
-        box-shadow: none;
-        padding: 0;
-      }
-      .emergency-actions, .emergency-close { display: none; }
-    }
-  </style>
+@media(max-width:560px){.hero{padding-top:2.5rem}.nav .btn span{display:none}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.hero h1 span{opacity:1;transform:none}}
+@media print{body *{visibility:hidden}.em,.em *{visibility:visible}.em{position:absolute;inset:0;max-width:none;max-height:none;background:#fff;color:#000}.mfoot,.x,.print{display:none}}
+</style>
 </head>
 <body>
 
 <header>
-  <div class="nav-container">
-    <a href="#" class="brand">
-      <div class="brand-icon">Rx</div>
-      <div>
-        <div class="brand-title">RxGuard</div>
-      </div>
-      <span class="brand-badge">Gemma 4 Multimodal</span>
-      <span class="brand-badge" style="background:rgba(2,132,199,0.2); border-color:#0284c7; color:#38bdf8;">🌊 DigitalOcean AI & Hermes</span>
-    </a>
-    <div class="header-actions">
-      <button id="btn-open-hermes" class="btn-toggle" style="background:rgba(2,132,199,0.15); border-color:#0284c7; color:#38bdf8;" title="1-Click Deploy Hermes Agent on DigitalOcean">
-        <span>🌊</span> 1-Click Deploy Hermes
-      </button>
-      <button id="btn-senior" class="btn-toggle" title="Increase text size and contrast">
-        <span>👵</span> Senior / Grandma Mode
-      </button>
+  <div class="wrap bar">
+    <div class="brand"><span class="mark" aria-hidden="true"></span>RxGuard</div>
+    <div class="nav">
+      <button id="btn-open-hermes" class="btn" type="button">Deploy agent</button>
+      <button id="btn-senior" class="btn" type="button" aria-pressed="false">Large text</button>
     </div>
   </div>
 </header>
 
-<main>
-  <div class="hero">
-    <h1>Visual Medication Safety & Conflict Copilot</h1>
-    <p>Ask Gemma about your medications. Photograph multiple pill bottles, blister packs, or prescriptions to cross-check for lethal drug-drug interactions, duplicate active ingredients, and food traps.</p>
-  </div>
+<main class="wrap">
+  <section class="hero">
+    <h1><span>Check</span> <span>your medicines</span> <span>before you take them.</span></h1>
+    <p>Photograph your pill bottles or describe what you take. RxGuard flags dangerous combinations, duplicate ingredients and food clashes, then builds a daily schedule.</p>
+  </section>
 
-  <!-- Quick Demo Scenarios for Judges -->
-  <div class="presets-box">
-    <div class="presets-label">
-      <span>⚡ Quick Demo Scenarios (1-Click Evaluation for Judges)</span>
-    </div>
-    <div class="presets-grid">
-      <button class="preset-chip" onclick="loadPreset('overdose')">
-        <div class="preset-title"><span style="color:#ef4444">🔴</span> Lethal Overdose Conflict</div>
-        <div class="preset-desc">Percocet + Tylenol + NyQuil (Severe Acetaminophen duplicate toxicity)</div>
-      </button>
-      <button class="preset-chip" onclick="loadPreset('spacing')">
-        <div class="preset-title"><span style="color:#f59e0b">🟡</span> Food & Spacing Trap</div>
-        <div class="preset-desc">Synthroid (Thyroid) + Calcium + Lipitor with Grapefruit breakfast</div>
-      </button>
-      <button class="preset-chip" onclick="loadPreset('safe')">
-        <div class="preset-title"><span style="color:#10b981">🟢</span> Safe Routine Regimen</div>
-        <div class="preset-desc">Metformin 500mg twice daily + Lisinopril 10mg morning schedule</div>
-      </button>
-    </div>
-  </div>
-
-  <!-- Input Form -->
-  <div class="input-card">
+  <section class="panel">
     <form id="rx-form">
-      <div class="form-group">
-        <label>Medication Photos (Countertop Multi-Bottle Scan or Single Label)</label>
-        <div class="dropzone" id="dropzone">
+      <div class="field">
+        <label for="images-input">Medication photos</label>
+        <div class="drop" id="dropzone">
           <input type="file" id="images-input" multiple accept="image/jpeg,image/png,image/webp">
-          <div class="dropzone-icon">📸</div>
-          <div class="dropzone-text">Drop photos of your medication bottles or blister packs here</div>
-          <div class="dropzone-subtext">Supports countertop multi-bottle photos, JPEG, PNG, or WebP up to 8MB</div>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+          <strong>Drop photos of bottles or blister packs</strong>
+          <small>JPEG, PNG or WebP, up to 8 MB each</small>
         </div>
-        <div class="thumbnails-grid" id="thumbnails-grid"></div>
+        <div class="thumbs" id="thumbnails-grid"></div>
       </div>
 
-      <div class="form-group">
-        <label for="question">Questions or Patient Context (Optional)</label>
-        <textarea id="question" name="question" placeholder="e.g. Can I take these together? Are there any foods I should avoid?"></textarea>
-      </div>
-
-      <div class="form-group" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem; background:rgba(11,15,25,0.4); padding:0.75rem 1rem; border-radius:8px; border:1px solid var(--card-border);">
-        <label style="margin:0; font-size:0.85rem; color:var(--fg-muted);">AI Reasoning Engine:</label>
-        <div style="display:flex; gap:1.25rem; font-size:0.85rem; font-weight:600;">
-          <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; margin:0;">
-            <input type="radio" name="engine" value="gemini" checked>
-            <span>🌟 Google Gemma 4 (Multimodal)</span>
-          </label>
-          <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; margin:0;">
-            <input type="radio" name="engine" value="digitalocean">
-            <span>🌊 DigitalOcean Serverless AI (Llama 3.3)</span>
-          </label>
+      <div class="field">
+        <label for="question">Questions or context (optional)</label>
+        <textarea id="question" name="question" placeholder="Can I take these together? Any foods I should avoid?"></textarea>
+        <div class="examples">
+          <span>Try an example:</span>
+          <button type="button" class="chip" onclick="loadPreset('overdose')">Duplicate painkillers</button>
+          <button type="button" class="chip" onclick="loadPreset('spacing')">Timing and food</button>
+          <button type="button" class="chip" onclick="loadPreset('safe')">Routine regimen</button>
         </div>
       </div>
 
-      <div class="form-actions">
-        <label class="camera-trigger" for="images-input">
-          <span>📷</span> Add / Snap Photo
-        </label>
-        <button type="submit" class="btn-submit" id="btn-submit">
-          <span id="btn-icon">🛡️</span>
-          <span id="btn-text">Analyze Medication Safety</span>
-        </button>
+      <div class="field">
+        <span class="lbl">Analysis engine</span>
+        <div class="engine">
+          <label><input type="radio" name="engine" value="gemini" checked> Google Gemma 4 (multimodal)</label>
+          <label><input type="radio" name="engine" value="digitalocean"> DigitalOcean Serverless AI (Llama 3.3)</label>
+        </div>
+      </div>
+
+      <div class="actions">
+        <label class="link" for="images-input">Add or take a photo</label>
+        <button type="submit" class="go" id="btn-submit"><span class="spin"></span><span id="btn-text">Check my medications</span></button>
       </div>
     </form>
-  </div>
+  </section>
 
-  <!-- Status / Loading -->
-  <div id="status-card" style="display:none; margin-bottom: 2rem; text-align:center; padding: 2rem; background: var(--card-bg); border-radius: var(--radius); border: 1px solid var(--card-border);">
-    <div class="spinner" style="margin: 0 auto 1rem; width: 32px; height: 32px; border-width: 3px;"></div>
-    <div id="status-msg" style="font-weight: 700; font-size: 1.1rem; margin-bottom: 0.3rem;">Cross-referencing medications with Gemma...</div>
-    <div style="font-size: 0.85rem; color: var(--fg-muted);">Checking drug interactions, duplicate compounds, and food contraindications</div>
-  </div>
+  <div id="status-card"><span id="status-msg">Cross-referencing medications…</span></div>
 
-  <!-- Results Section -->
-  <div id="results-section">
-    <!-- Safety Alert Banner -->
-    <div id="safety-banner" class="safety-banner safe">
-      <div class="banner-icon" id="banner-icon">🛡️</div>
-      <div class="banner-content">
-        <span class="banner-badge" id="banner-score">SAFE</span>
-        <div class="banner-title" id="banner-title">No Immediate Interaction Identified</div>
-        <div class="banner-desc" id="banner-desc">All identified medications appear compatible under standard dosing guidelines.</div>
+  <section id="results-section" aria-live="polite">
+    <div id="safety-banner" class="banner safe">
+      <div class="ring" id="banner-icon">&#10003;</div>
+      <div>
+        <span class="tag" id="banner-score">SAFE</span>
+        <h2 id="banner-title">No immediate interactions found</h2>
+        <p id="banner-desc">All identified medications appear compatible under standard dosing.</p>
       </div>
     </div>
 
-    <!-- Grandma Audio Readout -->
-    <div class="audio-player-card">
-      <div class="audio-info">
-        <button id="btn-play-voice" class="audio-pulse" title="Read explanation aloud">🔊</button>
-        <div class="audio-text">
-          <h4>Grandma Mode Voice Explanation</h4>
-          <p id="audio-caption">Click to listen to plain-English spoken instructions</p>
-        </div>
+    <div class="voice">
+      <div>
+        <h4>Spoken explanation</h4>
+        <p id="audio-caption">Listen to a plain-language summary.</p>
       </div>
-      <div class="audio-controls">
-        <button id="btn-stop-voice" class="btn-audio" style="display:none;">⏹️ Stop</button>
+      <div class="voice-btns">
+        <button id="btn-play-voice" class="btn" type="button">Play</button>
+        <button id="btn-stop-voice" class="btn" type="button" style="display:none">Stop</button>
       </div>
     </div>
 
-    <!-- Conflicts & Warnings -->
-    <div class="section-title">
-      <span>⚠️</span> Conflict Radar & Clinical Alerts
-    </div>
-    <div class="conflicts-list" id="conflicts-list"></div>
+    <h3 class="sec">Conflicts and alerts</h3>
+    <div class="list" id="conflicts-list"></div>
 
-    <!-- Detected Medications -->
-    <div class="section-title">
-      <span>💊</span> Identified Medications & Strengths
-    </div>
-    <div class="medications-grid" id="medications-grid"></div>
+    <h3 class="sec">Identified medications</h3>
+    <div class="grid" id="medications-grid"></div>
 
-    <!-- 24-Hour Pillbox Schedule -->
-    <div class="section-title">
-      <span>🗓️</span> Personalized Daily Pillbox Schedule
-    </div>
-    <div class="schedule-grid">
-      <div class="schedule-slot">
-        <div class="slot-header">🌅 Morning (8:00 AM)</div>
-        <ul class="slot-items" id="slot-morning"></ul>
-      </div>
-      <div class="schedule-slot">
-        <div class="slot-header">☀️ Afternoon (1:00 PM)</div>
-        <ul class="slot-items" id="slot-afternoon"></ul>
-      </div>
-      <div class="schedule-slot">
-        <div class="slot-header">🌙 Evening (6:00 PM)</div>
-        <ul class="slot-items" id="slot-evening"></ul>
-      </div>
-      <div class="schedule-slot">
-        <div class="slot-header">🛌 Bedtime (10:00 PM)</div>
-        <ul class="slot-items" id="slot-bedtime"></ul>
-      </div>
+    <h3 class="sec">Daily schedule</h3>
+    <div class="day">
+      <div class="slot"><h4>Morning</h4><time>8:00 AM</time><ul id="slot-morning"></ul></div>
+      <div class="slot"><h4>Afternoon</h4><time>1:00 PM</time><ul id="slot-afternoon"></ul></div>
+      <div class="slot"><h4>Evening</h4><time>6:00 PM</time><ul id="slot-evening"></ul></div>
+      <div class="slot"><h4>Bedtime</h4><time>10:00 PM</time><ul id="slot-bedtime"></ul></div>
     </div>
 
-    <!-- Action Buttons -->
-    <div class="dashboard-actions">
-      <button class="btn-action primary" id="btn-calendar-export">
-        <span>📅</span> Export to Apple / Google Calendar (.ics)
-      </button>
-      <button class="btn-action" id="btn-open-emergency">
-        <span>🚨</span> View & Print Paramedic Emergency Card
-      </button>
-      <button class="btn-action" id="btn-dispatch-hermes" style="border-color:#0284c7; color:#38bdf8; background:rgba(2,132,199,0.15);">
-        <span>🤖</span> Dispatch Alert to Hermes 24/7 Agent (DigitalOcean)
-      </button>
+    <div class="cta">
+      <button class="btn main" id="btn-calendar-export" type="button">Add to calendar (.ics)</button>
+      <button class="btn" id="btn-open-emergency" type="button">Emergency card</button>
+      <button class="btn" id="btn-dispatch-hermes" type="button">Send alert to Hermes agent</button>
     </div>
 
-    <!-- Metadata Footer -->
-    <div class="meta-bar">
-      <div>Gemma Inference: <span id="meta-model" style="color:var(--accent); font-weight:700;">gemma-4-26b-a4b-it</span></div>
-      <div>Attempts: <span id="meta-attempts">1</span></div>
-      <div>Disclaimer: For educational & hackathon demonstration. Consult a licensed pharmacist for medical advice.</div>
+    <div class="meta">
+      <span>Model: <b id="meta-model">gemma-4-26b-a4b-it</b></span>
+      <span>Attempts: <b id="meta-attempts">1</b></span>
+      <span>Educational demo. Confirm with a licensed pharmacist.</span>
     </div>
-  </div>
+  </section>
 </main>
 
-<!-- Emergency Wallet Card Modal -->
-<div class="modal-overlay" id="emergency-modal-overlay">
-  <div class="emergency-modal">
-    <div class="emergency-header">
-      <div class="emergency-title">
-        <span>🚨</span> EMERGENCY MEDICAL REGIMEN CARD
-      </div>
-      <button class="emergency-close" id="btn-close-modal">&times;</button>
-    </div>
-
-    <div class="emergency-field">
-      <label>Patient Immediate Status & Priority Action</label>
-      <p id="em-action" style="font-weight:700; color:#b91c1c;">Routine medication regimen.</p>
-    </div>
-
-    <div class="emergency-field">
-      <label>Active Medications & Dosages</label>
-      <p id="em-meds">None registered</p>
-    </div>
-
-    <div class="emergency-field">
-      <label>Critical Allergies & Contraindications</label>
-      <p id="em-contraindications" style="color:#b91c1c; font-weight:600;">No severe allergies identified.</p>
-    </div>
-
-    <div class="emergency-field">
-      <label>First Responder / Clinician Notes</label>
-      <p id="em-notes" style="font-size:0.85rem; color:#4b5563;">Generated by RxGuard visual safety analysis.</p>
-    </div>
-
-    <div class="emergency-actions">
-      <button class="btn-modal print" onclick="window.print()">🖨️ Print Wallet Card</button>
-    </div>
+<!-- Emergency card -->
+<div class="overlay" id="emergency-modal-overlay">
+  <div class="modal em" role="dialog" aria-modal="true" aria-label="Emergency medication card">
+    <div class="modal-h"><h3>Emergency medication card</h3><button class="x" id="btn-close-modal" aria-label="Close">&times;</button></div>
+    <div class="mf"><div class="lbl">Priority action</div><p id="em-action">Routine medication regimen.</p></div>
+    <div class="mf"><div class="lbl">Active medications and doses</div><p id="em-meds">None registered</p></div>
+    <div class="mf"><div class="lbl">Allergies and contraindications</div><p id="em-contraindications">None reported</p></div>
+    <div class="mf"><div class="lbl">Notes for responders</div><p id="em-notes">Generated by RxGuard.</p></div>
+    <div class="mfoot"><span></span><button class="print" onclick="window.print()">Print card</button></div>
   </div>
 </div>
 
-<!-- Hermes 1-Click DigitalOcean Modal -->
-<div class="modal-overlay" id="hermes-modal-overlay">
-  <div class="emergency-modal" style="background:#0f172a; color:#f8fafc; border:1px solid #1e293b; max-width:680px;">
-    <div class="emergency-header" style="border-bottom-color:#0284c7;">
-      <div class="emergency-title" style="color:#38bdf8;">
-        <span>🌊</span> 1-Click Deploy Hermes Agent on DigitalOcean
-      </div>
-      <button class="emergency-close" id="btn-close-hermes" style="color:#94a3b8;">&times;</button>
-    </div>
-
-    <p style="font-size:0.9rem; color:#94a3b8; margin-bottom:1.25rem;">
-      Deploy Nous Research's autonomous <strong>Hermes Agent</strong> directly to a DigitalOcean Droplet with 1 click, pre-wired to <strong>DigitalOcean Serverless Inference</strong> (<code>https://inference.do-ai.run/v1</code>).
-    </p>
-
-    <div style="background:#1e293b; border-radius:8px; padding:1.1rem; margin-bottom:1rem;">
-      <div style="font-weight:700; font-size:0.9rem; color:#38bdf8; margin-bottom:0.4rem;">Option 1: DigitalOcean Marketplace 1-Click Droplet</div>
-      <p style="font-size:0.82rem; color:#cbd5e1; margin-bottom:0.75rem;">Spin up a pre-configured Ubuntu Droplet running Hermes Agent with persistent memory, tool execution, and Telegram/Discord caregiver gateways.</p>
-      <a href="https://cloud.digitalocean.com/droplets/new?image=hermes-agent" target="_blank" class="btn-action primary" style="font-size:0.85rem; padding:0.5rem 1.1rem; text-decoration:none; display:inline-flex;">
-        🚀 Launch Hermes 1-Click Droplet
-      </a>
-    </div>
-
-    <div style="background:#1e293b; border-radius:8px; padding:1.1rem; margin-bottom:1.25rem;">
-      <div style="font-weight:700; font-size:0.9rem; color:#38bdf8; margin-bottom:0.4rem;">Option 2: Automated 1-Click Setup Command</div>
-      <p style="font-size:0.82rem; color:#cbd5e1; margin-bottom:0.5rem;">On any fresh DigitalOcean Ubuntu Droplet, run this automated setup script:</p>
-      <div style="background:#0b0f19; padding:0.7rem; border-radius:6px; font-family:'JetBrains Mono', monospace; font-size:0.75rem; color:#38bdf8; overflow-x:auto;">
-        curl -sSL https://raw.githubusercontent.com/clencyc/gemma-demo/main/scripts/deploy_hermes_droplet.sh | bash
-      </div>
-    </div>
-
-    <div class="emergency-actions" style="justify-content:space-between; align-items:center;">
-      <span id="hermes-status-text" style="font-size:0.8rem; color:#10b981;">✓ Ready for DigitalOcean Serverless Inference</span>
-      <button class="btn-modal" id="btn-test-hermes" style="background:#0284c7; color:#fff; border:none;">
-        ⚡ Test Hermes Connection
-      </button>
-    </div>
+<!-- Hermes -->
+<div class="overlay" id="hermes-modal-overlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Deploy Hermes agent">
+    <div class="modal-h"><h3>Deploy the Hermes agent</h3><button class="x" id="btn-close-hermes" aria-label="Close">&times;</button></div>
+    <p style="color:var(--muted);font-size:.9rem;margin-bottom:1.1rem">Run Nous Research’s Hermes agent on a DigitalOcean Droplet, connected to Serverless Inference at <code>https://inference.do-ai.run/v1</code>.</p>
+    <div class="opt"><b>Marketplace Droplet</b><p>A preconfigured Ubuntu Droplet with persistent memory, tool execution and Telegram or Discord caregiver alerts.</p>
+      <a class="btn main" style="text-decoration:none;display:inline-block;background:var(--brand);color:var(--brand-ink);border-color:var(--brand)" href="https://cloud.digitalocean.com/droplets/new?image=hermes-agent" target="_blank" rel="noopener">Launch Droplet</a></div>
+    <div class="opt"><b>Setup script</b><p>On a fresh Ubuntu Droplet, run:</p>
+      <div class="code">curl -sSL https://raw.githubusercontent.com/clencyc/gemma-demo/main/scripts/deploy_hermes_droplet.sh | bash</div></div>
+    <div class="mfoot"><span id="hermes-status-text">Ready for DigitalOcean Serverless Inference</span><button class="btn" id="btn-test-hermes" type="button">Test connection</button></div>
   </div>
 </div>
+
+<footer class="wrap meta" style="border:0"><span>RxGuard</span></footer>
 
 <script>
-  let selectedFiles = [];
-  let currentStructuredData = null;
-  let isSpeaking = false;
+let selectedFiles = [], currentStructuredData = null;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
-  const dropzone = document.getElementById("dropzone");
-  const fileInput = document.getElementById("images-input");
-  const thumbnailsGrid = document.getElementById("thumbnails-grid");
-  const form = document.getElementById("rx-form");
-  const questionEl = document.getElementById("question");
-  const btnSubmit = document.getElementById("btn-submit");
-  const statusCard = document.getElementById("status-card");
-  const statusMsg = document.getElementById("status-msg");
-  const resultsSection = document.getElementById("results-section");
+const dropzone = $("dropzone"), fileInput = $("images-input"), thumbs = $("thumbnails-grid"),
+  form = $("rx-form"), questionEl = $("question"), btnSubmit = $("btn-submit"),
+  statusCard = $("status-card"), statusMsg = $("status-msg"), results = $("results-section"),
+  btnPlay = $("btn-play-voice"), btnStop = $("btn-stop-voice"),
+  emModal = $("emergency-modal-overlay"), hermesModal = $("hermes-modal-overlay");
 
-  // Voice speech synthesis
-  const btnPlayVoice = document.getElementById("btn-play-voice");
-  const btnStopVoice = document.getElementById("btn-stop-voice");
+// Large text toggle
+const btnSenior = $("btn-senior");
+btnSenior.addEventListener("click", () => {
+  const on = document.body.classList.toggle("senior");
+  btnSenior.classList.toggle("on", on);
+  btnSenior.setAttribute("aria-pressed", on);
+});
 
-  // Emergency Modal
-  const emergencyModal = document.getElementById("emergency-modal-overlay");
-  const btnOpenEmergency = document.getElementById("btn-open-emergency");
-  const btnCloseModal = document.getElementById("btn-close-modal");
-
-  // Senior mode toggle
-  const btnSenior = document.getElementById("btn-senior");
-  btnSenior.addEventListener("click", () => {
-    document.body.classList.toggle("senior-mode");
-    btnSenior.classList.toggle("active");
+// Files
+fileInput.addEventListener("change", e => { handleFiles([...e.target.files]); fileInput.value = ""; });
+dropzone.addEventListener("dragover", e => { e.preventDefault(); dropzone.classList.add("dragover"); });
+dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+dropzone.addEventListener("drop", e => {
+  e.preventDefault(); dropzone.classList.remove("dragover");
+  if (e.dataTransfer.files.length) handleFiles([...e.dataTransfer.files]);
+});
+function handleFiles(files) {
+  files.filter(f => f.type.startsWith("image/")).forEach(f => selectedFiles.push(f));
+  renderThumbs();
+}
+function renderThumbs() {
+  thumbs.innerHTML = "";
+  selectedFiles.forEach((file, i) => {
+    const w = document.createElement("div"); w.className = "thumb";
+    const img = document.createElement("img"); img.src = URL.createObjectURL(file); img.alt = "Selected medication photo";
+    const b = document.createElement("button"); b.type = "button"; b.innerHTML = "&times;"; b.setAttribute("aria-label", "Remove photo");
+    b.onclick = e => { e.stopPropagation(); selectedFiles.splice(i, 1); renderThumbs(); };
+    w.append(img, b); thumbs.appendChild(w);
   });
+}
 
-  // Dropzone handling
-  fileInput.addEventListener("change", (e) => {
-    handleFiles(Array.from(e.target.files));
-  });
+// Examples
+const PRESETS = {
+  overdose: "I took a Percocet (Oxycodone/Acetaminophen 5/325mg) for knee surgery pain, and I just took Extra Strength Tylenol (500mg) and NyQuil Severe Cold for flu symptoms. Can I take these together?",
+  spacing: "I take Synthroid (Levothyroxine 75mcg) first thing in the morning with a Calcium + Vitamin D supplement. I also drink fresh grapefruit juice with breakfast and take Lipitor (Atorvastatin 20mg). Is this safe?",
+  safe: "I have been prescribed Metformin 500mg twice daily with meals for diabetes, and Lisinopril 10mg once daily in the morning for blood pressure. Can you check my regimen and create my daily schedule?"
+};
+function loadPreset(key) {
+  if (!PRESETS[key]) return;
+  questionEl.value = PRESETS[key];
+  selectedFiles = []; renderThumbs();
+  form.scrollIntoView({ behavior: "smooth" });
+  setTimeout(() => form.requestSubmit(), 200);
+}
 
-  dropzone.addEventListener("dragover", (e) => {
-    e.preventDefault();
-    dropzone.classList.add("dragover");
-  });
-  dropzone.addEventListener("dragleave", () => {
-    dropzone.classList.remove("dragover");
-  });
-  dropzone.addEventListener("drop", (e) => {
-    e.preventDefault();
-    dropzone.classList.remove("dragover");
-    if (e.dataTransfer.files.length) {
-      handleFiles(Array.from(e.dataTransfer.files));
-    }
-  });
+// Submit
+form.addEventListener("submit", async e => {
+  e.preventDefault();
+  const question = questionEl.value.trim();
+  if (!question && !selectedFiles.length) { alert("Enter a question or add a medication photo."); return; }
+  const engine = document.querySelector('input[name="engine"]:checked')?.value || "gemini";
 
-  function handleFiles(files) {
-    for (const f of files) {
-      if (f.type.startsWith("image/")) {
-        selectedFiles.push(f);
-      }
-    }
-    renderThumbnails();
+  btnSubmit.disabled = true;
+  document.body.classList.add("busy");
+  statusCard.style.display = "block";
+  results.style.display = "none"; results.classList.remove("show");
+  statusMsg.textContent = engine === "digitalocean"
+    ? "Calling DigitalOcean Serverless Inference…"
+    : "Calling Gemma multimodal reasoning…";
+
+  const fd = new FormData();
+  fd.append("question", question || "Please identify the medications in this photo and check for interactions, duplicate ingredients, and dosing schedule.");
+  fd.append("engine", engine);
+  if (selectedFiles.length === 1) fd.append("image", selectedFiles[0]);
+  else selectedFiles.forEach(f => fd.append("images", f));
+
+  try {
+    const res = await fetch("/api/ask", { method: "POST", body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Server request failed (" + res.status + ")");
+    currentStructuredData = data.data || null;
+    renderDashboard(data);
+  } catch (err) {
+    alert("Error: " + err.message);
+  } finally {
+    btnSubmit.disabled = false;
+    document.body.classList.remove("busy");
+    statusCard.style.display = "none";
   }
+});
 
-  function renderThumbnails() {
-    thumbnailsGrid.innerHTML = "";
-    selectedFiles.forEach((file, index) => {
-      const wrap = document.createElement("div");
-      wrap.className = "thumb-wrap";
-      const img = document.createElement("img");
-      img.src = URL.createObjectURL(file);
-      const removeBtn = document.createElement("button");
-      removeBtn.className = "thumb-remove";
-      removeBtn.innerHTML = "&times;";
-      removeBtn.onclick = (e) => {
-        e.stopPropagation();
-        selectedFiles.splice(index, 1);
-        renderThumbnails();
-      };
-      wrap.appendChild(img);
-      wrap.appendChild(removeBtn);
-      thumbnailsGrid.appendChild(wrap);
+function renderDashboard(api) {
+  const data = api.data || {};
+  $("meta-model").textContent = api.model || "gemma-4-26b-a4b-it";
+  $("meta-attempts").textContent = api.attempts || 1;
+
+  const score = (data.safety_score || "SAFE").toUpperCase();
+  const cls = score === "DANGER" ? "danger" : score === "CAUTION" ? "warning" : "safe";
+  $("safety-banner").className = "banner " + cls;
+  $("banner-score").textContent = score;
+  $("banner-icon").textContent = score === "DANGER" ? "!" : score === "CAUTION" ? "!" : "\u2713";
+  $("banner-title").textContent = data.headline ||
+    (score === "DANGER" ? "High-risk medication conflict detected"
+      : score === "CAUTION" ? "Important timing or dietary restrictions"
+      : "No immediate interactions found");
+  $("banner-desc").textContent = data.audio_summary || api.answer || "Compatible regimen.";
+
+  const cl = $("conflicts-list"); cl.innerHTML = "";
+  const conflicts = data.conflicts_and_warnings || [];
+  if (!conflicts.length) {
+    cl.innerHTML = `<div class="conflict low"><div class="conflict-h"><b>Clear regimen</b></div><p>No dangerous interactions, duplicate compounds or food clashes were flagged.</p></div>`;
+  } else conflicts.forEach(c => {
+    const sev = (c.severity || "LOW").toLowerCase();
+    const d = document.createElement("div"); d.className = "conflict " + sev;
+    d.innerHTML = `<div class="conflict-h"><b>${esc(c.title || "Clinical notice")}</b><span class="sev ${sev}">${esc(c.severity || "INFO")}</span></div><p>${esc(c.description)}</p>`;
+    cl.appendChild(d);
+  });
+
+  const mg = $("medications-grid"); mg.innerHTML = "";
+  const meds = data.medications || [];
+  if (!meds.length) mg.innerHTML = `<p style="color:var(--muted);font-size:.9rem">No individual medication breakdown was returned.</p>`;
+  else meds.forEach(m => {
+    const d = document.createElement("div"); d.className = "med";
+    d.innerHTML = `
+      <div class="med-h"><div class="med-n">${esc(m.name || "Medication")}</div><div class="med-d">${esc(m.dosage || "Standard")}</div></div>
+      <div class="med-g">${m.generic_name ? "Generic: " + esc(m.generic_name) : "&nbsp;"}</div>
+      <div class="med-p"><b>Frequency:</b> ${esc(m.frequency || "As prescribed")}</div>
+      <div class="med-p"><b>Instructions:</b> ${esc(m.instructions || "Follow label directions")}</div>
+      <div class="med-p"><b>Purpose:</b> ${esc(m.purpose || "Prescribed therapy")}</div>
+      ${(m.warnings || []).map(w => `<span class="med-w">${esc(w)}</span>`).join("")}`;
+    mg.appendChild(d);
+  });
+
+  const s = data.daily_schedule || {};
+  fillSlot("slot-morning", s.morning); fillSlot("slot-afternoon", s.afternoon);
+  fillSlot("slot-evening", s.evening); fillSlot("slot-bedtime", s.bedtime);
+
+  const em = data.emergency_card || {};
+  $("em-action").textContent = em.patient_action || "Routine medication regimen.";
+  $("em-meds").textContent = (em.active_medications || []).join(", ") || "None specified";
+  $("em-contraindications").textContent = (em.critical_allergies_or_contraindications || []).join(", ") || "None reported";
+  $("em-notes").textContent = em.clinician_notes || data.audio_summary || "Generated by RxGuard.";
+
+  results.style.display = "block";
+  void results.offsetWidth;
+  results.classList.add("show");
+  results.scrollIntoView({ behavior: "smooth" });
+}
+
+function fillSlot(id, items) {
+  const el = $(id); el.innerHTML = "";
+  if (!items || !items.length) { el.innerHTML = `<li class="none">Nothing scheduled</li>`; return; }
+  items.forEach(t => { const li = document.createElement("li"); li.textContent = t; el.appendChild(li); });
+}
+
+// Voice
+btnPlay.addEventListener("click", () => {
+  const text = currentStructuredData?.audio_summary || $("banner-desc").textContent;
+  if (text) speak(text);
+});
+btnStop.addEventListener("click", stopSpeech);
+function speak(text) {
+  if (!("speechSynthesis" in window)) { alert("Text-to-speech is not supported in this browser."); return; }
+  stopSpeech();
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = 0.95;
+  u.onstart = () => { btnPlay.classList.add("playing"); btnPlay.textContent = "Playing"; btnStop.style.display = "inline-block"; };
+  u.onend = u.onerror = stopSpeech;
+  speechSynthesis.speak(u);
+}
+function stopSpeech() {
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
+  btnPlay.classList.remove("playing"); btnPlay.textContent = "Play"; btnStop.style.display = "none";
+}
+
+// Calendar
+$("btn-calendar-export").addEventListener("click", async () => {
+  if (!currentStructuredData?.daily_schedule) { alert("No schedule available to export."); return; }
+  try {
+    const res = await fetch("/api/calendar/export", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(currentStructuredData.daily_schedule)
     });
-  }
+    if (!res.ok) throw new Error("Calendar export failed.");
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement("a");
+    a.href = url; a.download = "rxguard-medication-schedule.ics";
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  } catch (err) { alert("Error exporting calendar: " + err.message); }
+});
 
-  // Presets
-  const PRESETS = {
-    overdose: {
-      question: "I took a Percocet (Oxycodone/Acetaminophen 5/325mg) for knee surgery pain, and I just took Extra Strength Tylenol (500mg) and NyQuil Severe Cold for flu symptoms. Can I take these together?",
-    },
-    spacing: {
-      question: "I take Synthroid (Levothyroxine 75mcg) first thing in the morning with a Calcium + Vitamin D supplement. I also drink fresh grapefruit juice with breakfast and take Lipitor (Atorvastatin 20mg). Is this safe?",
-    },
-    safe: {
-      question: "I have been prescribed Metformin 500mg twice daily with meals for diabetes, and Lisinopril 10mg once daily in the morning for blood pressure. Can you check my regimen and create my daily schedule?",
-    }
-  };
+// Modals
+const bind = (modal, openBtn, closeBtn) => {
+  if (openBtn) $(openBtn).addEventListener("click", () => modal.classList.add("open"));
+  $(closeBtn).addEventListener("click", () => modal.classList.remove("open"));
+  modal.addEventListener("click", e => { if (e.target === modal) modal.classList.remove("open"); });
+};
+bind(emModal, "btn-open-emergency", "btn-close-modal");
+bind(hermesModal, "btn-open-hermes", "btn-close-hermes");
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") document.querySelectorAll(".overlay.open").forEach(o => o.classList.remove("open"));
+});
 
-  function loadPreset(key) {
-    const p = PRESETS[key];
-    if (!p) return;
-    questionEl.value = p.question;
-    selectedFiles = [];
-    renderThumbnails();
-    // Smooth scroll to form
-    form.scrollIntoView({ behavior: 'smooth' });
-    // Trigger submit
-    setTimeout(() => {
-      form.requestSubmit();
-    }, 200);
-  }
+$("btn-test-hermes").addEventListener("click", async () => {
+  const t = $("hermes-status-text");
+  t.textContent = "Connecting to DigitalOcean Serverless Inference…";
+  try {
+    const data = await (await fetch("/api/status/integrations")).json();
+    t.textContent = "Active: " + data.do_inference_endpoint;
+  } catch { t.textContent = "Hermes agent droplet ready on DigitalOcean"; }
+});
 
-  // Submit Handler
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const question = questionEl.value.trim();
-    if (!question && selectedFiles.length === 0) {
-      alert("Please enter a question or upload a medication photo.");
-      return;
-    }
-
-    const engine = document.querySelector('input[name="engine"]:checked')?.value || 'gemini';
-
-    btnSubmit.disabled = true;
-    statusCard.style.display = "block";
-    resultsSection.style.display = "none";
-    statusMsg.textContent = engine === "digitalocean" 
-      ? "Calling DigitalOcean Serverless Inference (https://inference.do-ai.run/v1)..." 
-      : "Calling Gemma multimodal reasoning via Gemini API...";
-
-    const formData = new FormData();
-    formData.append("question", question || "Please identify the medications in this photo and check for interactions, duplicate ingredients, and dosing schedule.");
-    formData.append("engine", engine);
-
-    if (selectedFiles.length === 1) {
-      formData.append("image", selectedFiles[0]);
-    } else if (selectedFiles.length > 1) {
-      selectedFiles.forEach((file) => formData.append("images", file));
-    }
-
-    try {
-      const response = await fetch("/api/ask", {
-        method: "POST",
-        body: formData,
-      });
-
-      const resData = await response.json();
-      if (!response.ok) {
-        throw new Error(resData.detail || "Server request failed (" + response.status + ")");
-      }
-
-      currentStructuredData = resData.data || null;
-      renderDashboard(resData);
-    } catch (err) {
-      alert("Error: " + err.message);
-    } finally {
-      btnSubmit.disabled = false;
-      statusCard.style.display = "none";
-    }
-  });
-
-  // Render Dashboard
-  function renderDashboard(apiResponse) {
-    const data = apiResponse.data || {};
-    const model = apiResponse.model || "gemma-4-26b-a4b-it";
-    const attempts = apiResponse.attempts || 1;
-
-    document.getElementById("meta-model").textContent = model;
-    document.getElementById("meta-attempts").textContent = attempts;
-
-    // Safety Banner
-    const banner = document.getElementById("safety-banner");
-    const bannerIcon = document.getElementById("banner-icon");
-    const bannerScore = document.getElementById("banner-score");
-    const bannerTitle = document.getElementById("banner-title");
-    const bannerDesc = document.getElementById("banner-desc");
-
-    const score = (data.safety_score || "SAFE").toUpperCase();
-    banner.className = "safety-banner " + (score === "DANGER" ? "danger" : score === "CAUTION" ? "warning" : "safe");
-    bannerScore.textContent = score;
-
-    if (score === "DANGER") {
-      bannerIcon.textContent = "🚨";
-      bannerTitle.textContent = data.headline || "DANGER: High-Risk Medication Conflict Detected";
-    } else if (score === "CAUTION") {
-      bannerIcon.textContent = "⚠️";
-      bannerTitle.textContent = data.headline || "CAUTION: Important Timing or Dietary Restrictions";
-    } else {
-      bannerIcon.textContent = "🛡️";
-      bannerTitle.textContent = data.headline || "SAFE: No Immediate Interactions Identified";
-    }
-    bannerDesc.textContent = data.audio_summary || apiResponse.answer || "Compatible regimen.";
-
-    // Conflicts List
-    const conflictsList = document.getElementById("conflicts-list");
-    conflictsList.innerHTML = "";
-    const conflicts = data.conflicts_and_warnings || [];
-    if (conflicts.length === 0) {
-      conflictsList.innerHTML = `<div class="conflict-item low"><div class="conflict-name">✓ Clear Regimen</div><div class="conflict-desc">No dangerous drug interactions, duplicate compounds, or food traps were flagged.</div></div>`;
-    } else {
-      conflicts.forEach(c => {
-        const item = document.createElement("div");
-        const sev = (c.severity || "LOW").toLowerCase();
-        item.className = `conflict-item ${sev}`;
-        item.innerHTML = `
-          <div class="conflict-header">
-            <span class="conflict-name">${c.title || "Clinical Notice"}</span>
-            <span class="conflict-badge ${sev}">${c.severity || "INFO"}</span>
-          </div>
-          <div class="conflict-desc">${c.description || ""}</div>
-        `;
-        conflictsList.appendChild(item);
-      });
-    }
-
-    // Medications Grid
-    const medsGrid = document.getElementById("medications-grid");
-    medsGrid.innerHTML = "";
-    const meds = data.medications || [];
-    if (meds.length === 0) {
-      medsGrid.innerHTML = `<p style="color:var(--fg-muted); font-size:0.9rem;">No individual pill breakdown available from query.</p>`;
-    } else {
-      meds.forEach(m => {
-        const card = document.createElement("div");
-        card.className = "med-card";
-        const warnings = (m.warnings || []).map(w => `<span style="color:#f59e0b; display:block; font-size:0.8rem;">⚠️ ${w}</span>`).join("");
-        card.innerHTML = `
-          <div class="med-header">
-            <div class="med-name">${m.name || "Medication"}</div>
-            <div class="med-dose">${m.dosage || "Standard"}</div>
-          </div>
-          <div class="med-generic">${m.generic_name ? "Generic: " + m.generic_name : ""}</div>
-          <div class="med-prop"><strong>Frequency:</strong> ${m.frequency || "As prescribed"}</div>
-          <div class="med-prop"><strong>Instructions:</strong> ${m.instructions || "Follow label directions"}</div>
-          <div class="med-prop"><strong>Purpose:</strong> ${m.purpose || "Prescribed therapy"}</div>
-          ${warnings}
-        `;
-        medsGrid.appendChild(card);
-      });
-    }
-
-    // Daily Schedule
-    const sched = data.daily_schedule || {};
-    populateSlot("slot-morning", sched.morning);
-    populateSlot("slot-afternoon", sched.afternoon);
-    populateSlot("slot-evening", sched.evening);
-    populateSlot("slot-bedtime", sched.bedtime);
-
-    // Emergency Card Data
-    const em = data.emergency_card || {};
-    document.getElementById("em-action").textContent = em.patient_action || "Routine medication regimen.";
-    document.getElementById("em-meds").textContent = (em.active_medications || []).join(", ") || "None specified";
-    document.getElementById("em-contraindications").textContent = (em.critical_allergies_or_contraindications || []).join(", ") || "No severe allergies reported";
-    document.getElementById("em-notes").textContent = em.clinician_notes || (data.audio_summary || "Generated by RxGuard analysis.");
-
-    // Show Results
-    resultsSection.style.display = "block";
-    resultsSection.scrollIntoView({ behavior: "smooth" });
-  }
-
-  function populateSlot(id, items) {
-    const el = document.getElementById(id);
-    el.innerHTML = "";
-    if (!items || items.length === 0) {
-      el.innerHTML = `<li class="slot-empty">No medications scheduled</li>`;
-      return;
-    }
-    items.forEach(item => {
-      const li = document.createElement("li");
-      li.className = "slot-pill";
-      li.textContent = item;
-      el.appendChild(li);
+$("btn-dispatch-hermes").addEventListener("click", async () => {
+  if (!currentStructuredData) { alert("Run an analysis first to generate an alert."); return; }
+  try {
+    const res = await fetch("/api/hermes/dispatch", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(currentStructuredData)
     });
-  }
-
-  // Grandma Voice Audio Synthesis
-  btnPlayVoice.addEventListener("click", () => {
-    if (!currentStructuredData && !document.getElementById("banner-desc").textContent) return;
-    const textToSpeak = currentStructuredData?.audio_summary || document.getElementById("banner-desc").textContent;
-    speakText(textToSpeak);
-  });
-
-  btnStopVoice.addEventListener("click", () => {
-    stopSpeech();
-  });
-
-  function speakText(text) {
-    if (!('speechSynthesis' in window)) {
-      alert("Text-to-speech is not supported by your browser.");
-      return;
-    }
-    stopSpeech();
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.95; // Clear pace for seniors
-    utterance.pitch = 1.0;
-
-    utterance.onstart = () => {
-      isSpeaking = true;
-      btnPlayVoice.classList.add("playing");
-      btnPlayVoice.textContent = "⏸️";
-      btnStopVoice.style.display = "inline-flex";
-    };
-    utterance.onend = utterance.onerror = () => {
-      stopSpeech();
-    };
-
-    window.speechSynthesis.speak(utterance);
-  }
-
-  function stopSpeech() {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
-    isSpeaking = false;
-    btnPlayVoice.classList.remove("playing");
-    btnPlayVoice.textContent = "🔊";
-    btnStopVoice.style.display = "none";
-  }
-
-  // Calendar Export (.ics)
-  document.getElementById("btn-calendar-export").addEventListener("click", async () => {
-    if (!currentStructuredData?.daily_schedule) {
-      alert("No schedule available to export.");
-      return;
-    }
-
-    try {
-      const res = await fetch("/api/calendar/export", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(currentStructuredData.daily_schedule),
-      });
-
-      if (!res.ok) throw new Error("Calendar export failed.");
-
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "rxguard-medication-schedule.ics";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      alert("Error exporting calendar: " + err.message);
-    }
-  });
-
-  // Emergency Modal Controls
-  btnOpenEmergency.addEventListener("click", () => {
-    emergencyModal.classList.add("open");
-  });
-  btnCloseModal.addEventListener("click", () => {
-    emergencyModal.classList.remove("open");
-  });
-  emergencyModal.addEventListener("click", (e) => {
-    if (e.target === emergencyModal) emergencyModal.classList.remove("open");
-  });
-
-  // Hermes DigitalOcean Modal Controls
-  const hermesModal = document.getElementById("hermes-modal-overlay");
-  const btnOpenHermes = document.getElementById("btn-open-hermes");
-  const btnCloseHermes = document.getElementById("btn-close-hermes");
-  const btnTestHermes = document.getElementById("btn-test-hermes");
-  const btnDispatchHermes = document.getElementById("btn-dispatch-hermes");
-
-  btnOpenHermes.addEventListener("click", () => {
-    hermesModal.classList.add("open");
-  });
-  btnCloseHermes.addEventListener("click", () => {
-    hermesModal.classList.remove("open");
-  });
-  hermesModal.addEventListener("click", (e) => {
-    if (e.target === hermesModal) hermesModal.classList.remove("open");
-  });
-
-  btnTestHermes.addEventListener("click", async () => {
-    const statusText = document.getElementById("hermes-status-text");
-    statusText.textContent = "Connecting to DigitalOcean Serverless Inference...";
-    try {
-      const res = await fetch("/api/status/integrations");
-      const data = await res.json();
-      statusText.textContent = "✓ DigitalOcean AI & Hermes Droplet Status: Active (" + data.do_inference_endpoint + ")";
-    } catch (err) {
-      statusText.textContent = "✓ Hermes Agent 1-Click Droplet Ready on DigitalOcean";
-    }
-  });
-
-  btnDispatchHermes.addEventListener("click", async () => {
-    if (!currentStructuredData) {
-      alert("Please run an analysis first to generate a clinical alert.");
-      return;
-    }
-    try {
-      const res = await fetch("/api/hermes/dispatch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(currentStructuredData),
-      });
-      const data = await res.json();
-      alert("🤖 " + (data.message || "Alert delivered to Hermes 24/7 Agent on DigitalOcean!"));
-    } catch (err) {
-      alert("Hermes dispatch: " + err.message);
-    }
-  });
+    const data = await res.json();
+    alert(data.message || "Alert delivered to the Hermes agent.");
+  } catch (err) { alert("Hermes dispatch: " + err.message); }
+});
 </script>
 </body>
 </html>
