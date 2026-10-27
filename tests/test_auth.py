@@ -5,9 +5,11 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app import main
-from app.auth import verify_password
+from datetime import datetime, timedelta, timezone
+
+from app.auth import hash_session_token, verify_password
 from app.database import Base, get_db
-from app.models import User
+from app.models import User, UserSession
 
 
 @pytest.fixture
@@ -196,5 +198,106 @@ def test_unauthenticated_user_cannot_access_medication_analysis(auth_client):
         "/api/ask",
         json={"question": "Can I take these medicines together?"},
     )
+
+    assert response.status_code == 401
+
+def test_expired_session_is_rejected(auth_client):
+    credentials = {
+        "email": "expired@example.com",
+        "password": "SecureTestPassword123!",
+    }
+
+    register_response = auth_client.post(
+        "/api/auth/register",
+        json=credentials,
+    )
+    assert register_response.status_code == 201
+
+    with auth_client.testing_session_local() as db:
+        user = db.query(User).filter_by(
+            email="expired@example.com"
+        ).first()
+
+        assert user is not None
+
+        session = UserSession(
+            user_id=user.id,
+            token_hash=hash_session_token("expired-test-token"),
+            expires_at=datetime.now(timezone.utc) - timedelta(minutes=1),
+        )
+
+        db.add(session)
+        db.commit()
+
+    auth_client.cookies.set(
+        "rxguard_session",
+        "expired-test-token",
+    )
+
+    response = auth_client.get("/api/auth/me")
+
+    assert response.status_code == 401
+
+def test_inactive_user_session_is_rejected(auth_client):
+    credentials = {
+        "email": "inactive@example.com",
+        "password": "SecureTestPassword123!",
+    }
+
+    register_response = auth_client.post(
+        "/api/auth/register",
+        json=credentials,
+    )
+    assert register_response.status_code == 201
+
+    with auth_client.testing_session_local() as db:
+        user = db.query(User).filter_by(
+            email="inactive@example.com"
+        ).first()
+
+        assert user is not None
+
+        user.is_active = False
+
+        session = UserSession(
+            user_id=user.id,
+            token_hash=hash_session_token("inactive-test-token"),
+            expires_at=datetime.now(timezone.utc) + timedelta(days=1),
+        )
+
+        db.add(session)
+        db.commit()
+
+    auth_client.cookies.set(
+        "rxguard_session",
+        "inactive-test-token",
+    )
+
+    response = auth_client.get("/api/auth/me")
+
+    assert response.status_code == 401
+
+def test_revoked_session_is_rejected(auth_client):
+    credentials = {
+        "email": "revoked@example.com",
+        "password": "SecureTestPassword123!",
+    }
+
+    register_response = auth_client.post(
+        "/api/auth/register",
+        json=credentials,
+    )
+    assert register_response.status_code == 201
+
+    login_response = auth_client.post(
+        "/api/auth/login",
+        json=credentials,
+    )
+    assert login_response.status_code == 200
+
+    revoke_response = auth_client.post("/api/auth/logout")
+    assert revoke_response.status_code == 200
+
+    response = auth_client.get("/api/auth/me")
 
     assert response.status_code == 401
