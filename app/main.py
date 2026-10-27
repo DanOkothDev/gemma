@@ -161,14 +161,27 @@ def ask(
                 file_list.append(f)
 
     # Route to DigitalOcean Serverless Inference if explicitly requested and text-only
+        
     if engine == "digitalocean" and not file_list and is_do_configured():
         try:
             do_res = ask_digitalocean_ai(question, load_system_prompt())
+
+            do_text = do_res.get("text", "")
+            do_data = do_res.get("data")
+
+            if not isinstance(do_data, dict):
+                do_data = parse_json_payload(do_text)
+
+            safe_data = ensure_structured_data(
+                do_text,
+                do_data if isinstance(do_data, dict) else None,
+            )
+
             return {
-                "answer": do_res["text"],
+                "answer": do_text,
                 "model": do_res["model"],
                 "attempts": 1,
-                "data": do_res["data"],
+                "data": safe_data,
             }
         except Exception as exc:
             log.warning("DigitalOcean AI failed, falling back to Gemma: %s", exc)
@@ -203,12 +216,20 @@ def ask(
         log.exception("Gemma request failed")
         raise HTTPException(502, "The model rejected this request.")
 
-    res = {"answer": answer.text, "model": answer.model, "attempts": answer.attempts}
-    if answer.data is not None:
-        res["data"] = answer.data
-    else:
-        parsed = parse_json_payload(answer.text)
-        if parsed is not None:
-            res["data"] = parsed
+    res = {
+    "answer": answer.text,
+    "model": answer.model,
+    "attempts": answer.attempts,
+    }
+
+    structured_data = answer.data
+
+    if not isinstance(structured_data, dict):
+        structured_data = parse_json_payload(answer.text)
+
+    res["data"] = ensure_structured_data(
+        answer.text,
+        structured_data if isinstance(structured_data, dict) else None,
+    )
 
     return res

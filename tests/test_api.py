@@ -57,7 +57,11 @@ def test_text_only_question(monkeypatch):
     monkeypatch.setattr(main, "ask_gemma", fake)
     res = post("hello there")
     assert res.status_code == 200
-    assert res.json() == {"answer": "an answer", "model": "m1", "attempts": 1}
+    body = res.json()
+    assert body["answer"] == "an answer"
+    assert body["model"] == "m1"
+    assert body["attempts"] == 1
+    assert body["data"]["safety_score"] == "UNVERIFIED"
     assert seen["args"] == ("hello there", None)
 
 
@@ -152,3 +156,76 @@ def test_hermes_dispatch_endpoint():
     data = res.json()
     assert data["status"] == "dispatched"
     assert "Hermes" in data["message"]
+
+
+def test_api_downgrades_ai_safe_to_unverified(monkeypatch):
+    structured = {
+        "safety_score": "SAFE",
+        "headline": "No risks found",
+        "audio_summary": "The medicines appear safe.",
+        "medications": [],
+        "conflicts_and_warnings": [],
+    }
+
+    def fake(prompt, image_path=None, **_):
+        return Answer(
+            text='{"safety_score": "SAFE"}',
+            model="m1",
+            attempts=1,
+            data=structured,
+        )
+
+    monkeypatch.setattr(main, "ask_gemma", fake)
+
+    res = post("Can I take these medicines together?")
+
+    assert res.status_code == 200
+    data = res.json()["data"]
+    assert data["safety_score"] == "UNVERIFIED"
+    assert data["headline"] == "Safety has not been independently verified"
+
+
+def test_api_returns_unverified_when_structured_data_is_missing(monkeypatch):
+    def fake(prompt, image_path=None, **_):
+        return Answer(
+            text="I could not assess these medicines.",
+            model="m1",
+            attempts=1,
+        )
+
+    monkeypatch.setattr(main, "ask_gemma", fake)
+
+    res = post("Check these medicines")
+
+    assert res.status_code == 200
+    data = res.json()["data"]
+    assert data["safety_score"] == "UNVERIFIED"
+    assert data["conflicts_and_warnings"]
+
+def test_digitalocean_api_downgrades_safe_to_unverified(monkeypatch):
+    monkeypatch.setattr(main, "is_do_configured", lambda: True)
+
+    def fake_do(prompt, system_prompt=None):
+        return {
+            "text": '{"safety_score": "SAFE", "headline": "No risks found"}',
+            "model": "digitalocean/test-model",
+            "data": {
+                "safety_score": "SAFE",
+                "headline": "No risks found",
+            },
+        }
+
+    monkeypatch.setattr(main, "ask_digitalocean_ai", fake_do)
+
+    res = post(
+        "Check these medicines",
+        data={"engine": "digitalocean"},
+    )
+
+    assert res.status_code == 200
+    body = res.json()
+    assert body["model"] == "digitalocean/test-model"
+    assert body["data"]["safety_score"] == "UNVERIFIED"
+    assert body["data"]["headline"] == (
+        "Safety has not been independently verified"
+    )
