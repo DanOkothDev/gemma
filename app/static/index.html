@@ -153,6 +153,87 @@ footer{padding:2rem 0 3rem}
 .mfoot{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-top:1.25rem;font-size:.82rem;color:var(--ok)}
 .print{background:var(--ink);color:var(--bg);border:0;padding:.6rem 1.2rem;border-radius:999px;font-weight:700;cursor:pointer}
 
+/* Cookie consent banner */
+.cookie-banner {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 300;
+  display: none;
+  padding: 1rem;
+  background: var(--surface);
+  color: var(--ink);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, .12);
+}
+
+.cookie-banner.visible {
+  display: block;
+}
+
+.cookie-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.cookie-copy {
+  flex: 1 1 300px;
+}
+
+.cookie-copy h3 {
+  font: 700 1rem var(--display);
+  margin-bottom: .35rem;
+}
+
+.cookie-copy p {
+  color: var(--muted);
+  font-size: .88rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.cookie-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+
+.cookie-actions button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: .65rem 1rem;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: .85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cookie-actions .cookie-accept {
+  background: var(--brand);
+  color: var(--brand-ink);
+  border-color: var(--brand);
+}
+
+.cookie-actions button:focus-visible {
+  outline: 3px solid var(--brand);
+  outline-offset: 3px;
+}
+
+@media(max-width:560px) {
+  .cookie-actions {
+    width: 100%;
+  }
+
+  .cookie-actions button {
+    flex: 1;
+  }
+}
 @media(max-width:560px){.hero{padding-top:2.5rem}.nav .btn span{display:none}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.hero h1 span{opacity:1;transform:none}}
 @media print{body *{visibility:hidden}.em,.em *{visibility:visible}.em{position:absolute;inset:0;max-width:none;max-height:none;background:#fff;color:#000}.mfoot,.x,.print{display:none}}
@@ -290,6 +371,37 @@ footer{padding:2rem 0 3rem}
     <div class="mfoot"><span id="hermes-status-text">Ready for DigitalOcean Serverless Inference</span><button class="btn" id="btn-test-hermes" type="button">Test connection</button></div>
   </div>
 </div>
+
+<section
+  id="cookie-banner"
+  class="cookie-banner"
+  role="region"
+  aria-label="Cookie preferences"
+  aria-describedby="cookie-description"
+>
+  <div class="cookie-inner">
+    <div class="cookie-copy">
+      <h3>Privacy and cookies</h3>
+      <p id="cookie-description">
+        Essential cookies support secure sign-in and account security.
+        Optional analytics cookies will remain disabled unless you choose
+        to allow them. You can change your preferences at any time.
+      </p>
+    </div>
+
+    <div class="cookie-actions">
+      <button type="button" id="cookie-settings">
+        Cookie settings
+      </button>
+      <button type="button" id="cookie-reject">
+        Reject optional
+      </button>
+      <button type="button" id="cookie-accept" class="cookie-accept">
+        Accept optional
+      </button>
+    </div>
+  </div>
+</section>
 
 <footer class="wrap meta" style="border:0"><span>RxGuard</span></footer>
 
@@ -549,6 +661,76 @@ $("btn-dispatch-hermes").addEventListener("click", async () => {
     alert(data.message || "Alert delivered to the Hermes agent.");
   } catch (err) { alert("Hermes dispatch: " + err.message); }
 });
+// Cookie consent
+const cookieBanner = $("cookie-banner");
+const cookieStorageKey = "rxguard-cookie-consent";
+
+function hideCookieBanner() {
+  cookieBanner.classList.remove("visible");
+}
+
+function showCookieBanner() {
+  cookieBanner.classList.add("visible");
+}
+
+function saveCookieConsent(allowAnalytics) {
+  const consent = {
+    essential: true,
+    analytics: allowAnalytics,
+    updatedAt: new Date().toISOString()
+  };
+
+  localStorage.setItem(cookieStorageKey, JSON.stringify(consent));
+  hideCookieBanner();
+}
+
+function openCookieSettings() {
+  const saved = localStorage.getItem(cookieStorageKey);
+  let analyticsAllowed = false;
+
+  if (saved) {
+    try {
+      analyticsAllowed = JSON.parse(saved).analytics === true;
+    } catch {
+      analyticsAllowed = false;
+    }
+  }
+
+  const allow = window.confirm(
+    "Essential cookies are required for secure sign-in. " +
+    "Optional analytics cookies are currently not enabled in RxGuard. " +
+    "Choose OK to allow optional analytics if introduced, or Cancel to keep them disabled."
+  );
+
+  if (allow) {
+    saveCookieConsent(true);
+  } else {
+    saveCookieConsent(false);
+  }
+}
+
+$("cookie-accept").addEventListener("click", () => {
+  saveCookieConsent(true);
+});
+
+$("cookie-reject").addEventListener("click", () => {
+  saveCookieConsent(false);
+});
+
+$("cookie-settings").addEventListener("click", openCookieSettings);
+
+try {
+  const savedConsent = localStorage.getItem(cookieStorageKey);
+
+  if (savedConsent) {
+    JSON.parse(savedConsent);
+    hideCookieBanner();
+  } else {
+    showCookieBanner();
+  }
+} catch {
+  showCookieBanner();
+}
 </script>
 </body>
 </html>
