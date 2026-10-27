@@ -25,8 +25,11 @@ def test_health():
 
 def test_index_page_is_served():
     res = client.get("/")
+
     assert res.status_code == 200
-    assert "Ask Gemma" in res.text
+    assert "RxGuard" in res.text
+    assert "your medicines" in res.text
+    assert "before you take" in res.text
 
 
 def test_blank_question_is_rejected():

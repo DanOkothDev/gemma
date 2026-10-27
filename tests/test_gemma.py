@@ -196,10 +196,62 @@ def test_multi_image_upload_to_client(settings, sleeps, tmp_path):
 
 
 def test_ensure_structured_data_fallback():
-    data_danger = ensure_structured_data("Warning: dangerous duplicate acetaminophen detected!")
-    assert data_danger["safety_score"] == "DANGER"
-    assert "daily_schedule" in data_danger
-    assert "emergency_card" in data_danger
+    result = ensure_structured_data(
+        "Warning: dangerous duplicate acetaminophen detected!"
+    )
 
-    data_caution = ensure_structured_data("Please avoid eating with high-fat meals.")
-    assert data_caution["safety_score"] == "CAUTION"
+    assert result["safety_score"] == "UNVERIFIED"
+    assert result["headline"] == "Medication safety could not be verified"
+    assert result["daily_schedule"] == {
+        "morning": [],
+        "afternoon": [],
+        "evening": [],
+        "bedtime": [],
+    }
+
+
+def test_ensure_structured_data_does_not_infer_safety_from_text():
+    result = ensure_structured_data(
+        "No warnings were identified in this response."
+    )
+
+    assert result["safety_score"] == "UNVERIFIED"
+
+
+def test_ensure_structured_data_downgrades_unverified_safe_result():
+    result = ensure_structured_data(
+        "The regimen appears safe.",
+        data={
+            "safety_score": "SAFE",
+            "headline": "All clear",
+            "medications": [],
+            "conflicts_and_warnings": [],
+        },
+    )
+
+    assert result["safety_score"] == "UNVERIFIED"
+    assert result["headline"] == "Safety has not been independently verified"
+
+
+def test_ensure_structured_data_preserves_caution():
+    result = ensure_structured_data(
+        "A potential interaction was reported.",
+        data={
+            "safety_score": "CAUTION",
+            "headline": "Potential interaction",
+        },
+    )
+
+    assert result["safety_score"] == "CAUTION"
+
+
+def test_ensure_structured_data_preserves_danger():
+    result = ensure_structured_data(
+        "A high-risk interaction was reported.",
+        data={
+            "safety_score": "DANGER",
+            "headline": "Potential high-risk interaction",
+        },
+    )
+
+    assert result["safety_score"] == "DANGER"

@@ -133,27 +133,48 @@ def parse_json_payload(text: str) -> Optional[dict]:
 
 
 def ensure_structured_data(text: str, data: Optional[dict] = None) -> dict:
-    """Ensure a complete structured RxGuard response dictionary is available."""
-    if data and isinstance(data, dict) and "safety_score" in data:
-        return data
+    """Return structured data without treating missing evidence as proof of safety."""
+    valid_scores = {"SAFE", "CAUTION", "DANGER", "UNVERIFIED"}
 
-    text_lower = (text or "").lower()
-    has_warning = any(
-        w in text_lower
-        for w in ("warning", "danger", "conflict", "avoid", "do not", "contraindication", "overdose")
+    if isinstance(data, dict):
+        score = str(data.get("safety_score", "")).strip().upper()
+
+        if score in {"CAUTION", "DANGER"}:
+            return {**data, "safety_score": score}
+
+        if score == "UNVERIFIED":
+            return {**data, "safety_score": score}
+
+        # An AI-generated SAFE label is not independently verified.
+        # Until RxGuard has validated clinical evidence, do not present it as confirmed.
+        if score == "SAFE":
+            result = dict(data)
+            result["safety_score"] = "UNVERIFIED"
+            result["headline"] = "Safety has not been independently verified"
+            result["audio_summary"] = (
+                "The AI did not identify a warning, but RxGuard has not "
+                "independently verified that this medication regimen is safe. "
+                "Confirm the medicines and instructions with a pharmacist."
+            )
+            return result
+
+    message = (
+        "RxGuard could not produce a reliable structured safety assessment. "
+        "This does not establish that the medications are safe or unsafe. "
+        "Verify the medicines and instructions with a pharmacist before "
+        "relying on this result."
     )
-    score = "DANGER" if "danger" in text_lower or "overdose" in text_lower else ("CAUTION" if has_warning else "SAFE")
 
     return {
-        "safety_score": score,
-        "headline": "Medication Analysis Summary",
-        "audio_summary": (text[:250] + "...") if len(text) > 250 else text,
+        "safety_score": "UNVERIFIED",
+        "headline": "Medication safety could not be verified",
+        "audio_summary": message,
         "medications": [],
         "conflicts_and_warnings": [
             {
-                "severity": "HIGH" if score == "DANGER" else ("MEDIUM" if score == "CAUTION" else "LOW"),
-                "title": "Clinical & Safety Guidance",
-                "description": text or "No specific warnings identified.",
+                "severity": "MEDIUM",
+                "title": "Assessment requires verification",
+                "description": message,
             }
         ],
         "daily_schedule": {
@@ -163,13 +184,19 @@ def ensure_structured_data(text: str, data: Optional[dict] = None) -> dict:
             "bedtime": [],
         },
         "emergency_card": {
-            "patient_action": "Consult your prescribing doctor or pharmacist before making medication changes.",
+            "patient_action": (
+                "Verify medication names, doses, and instructions with a "
+                "pharmacist or prescribing clinician. Do not use this "
+                "unverified result to change prescribed treatment."
+            ),
             "active_medications": [],
             "critical_allergies_or_contraindications": [],
-            "clinician_notes": text,
+            "clinician_notes": (
+                "No independently verified medication safety assessment "
+                "is available."
+            ),
         },
     }
-
 
 @lru_cache(maxsize=1)
 def get_client(timeout_s: float = 30.0) -> Any:

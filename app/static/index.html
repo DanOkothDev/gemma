@@ -390,21 +390,53 @@ function renderDashboard(api) {
   $("meta-model").textContent = api.model || "gemma-4-26b-a4b-it";
   $("meta-attempts").textContent = api.attempts || 1;
 
-  const score = (data.safety_score || "SAFE").toUpperCase();
-  const cls = score === "DANGER" ? "danger" : score === "CAUTION" ? "warning" : "safe";
+  const allowedScores = ["SAFE", "CAUTION", "DANGER", "UNVERIFIED"];
+  const reportedScore = String(data.safety_score || "").toUpperCase();
+
+  const score =
+    allowedScores.includes(reportedScore) && reportedScore !== "SAFE"
+      ? reportedScore
+      : "UNVERIFIED";
+
+  const cls =
+    score === "DANGER"
+      ? "danger"
+      : score === "CAUTION"
+        ? "warning"
+        : "warning";
+
   $("safety-banner").className = "banner " + cls;
   $("banner-score").textContent = score;
-  $("banner-icon").textContent = score === "DANGER" ? "!" : score === "CAUTION" ? "!" : "\u2713";
-  $("banner-title").textContent = data.headline ||
-    (score === "DANGER" ? "High-risk medication conflict detected"
-      : score === "CAUTION" ? "Important timing or dietary restrictions"
-      : "No immediate interactions found");
-  $("banner-desc").textContent = data.audio_summary || api.answer || "Compatible regimen.";
+  $("banner-icon").textContent = score === "SAFE" ? "\u2713" : "!";
+
+  $("banner-title").textContent =
+    data.headline ||
+    (
+      score === "DANGER"
+        ? "Potential high-risk medication conflict"
+        : score === "CAUTION"
+          ? "Medication warning requires attention"
+          : "Medication safety has not been verified"
+    );
+
+  $("banner-desc").textContent =
+    data.audio_summary ||
+    api.answer ||
+    "No reliable safety assessment is available. Verify your medications with a pharmacist.";
 
   const cl = $("conflicts-list"); cl.innerHTML = "";
   const conflicts = data.conflicts_and_warnings || [];
   if (!conflicts.length) {
-    cl.innerHTML = `<div class="conflict low"><div class="conflict-h"><b>Clear regimen</b></div><p>No dangerous interactions, duplicate compounds or food clashes were flagged.</p></div>`;
+  cl.innerHTML = `
+    <div class="conflict medium">
+      <div class="conflict-h">
+        <b>Assessment incomplete</b>
+      </div>
+      <p>
+        No warnings were returned. This does not confirm that the
+        medication regimen is safe. Verify the results with a pharmacist.
+      </p>
+    </div>`;
   } else conflicts.forEach(c => {
     const sev = (c.severity || "LOW").toLowerCase();
     const d = document.createElement("div"); d.className = "conflict " + sev;
