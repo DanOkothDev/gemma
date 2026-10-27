@@ -8,9 +8,25 @@ from fastapi.testclient import TestClient
 
 from app import main
 from app.gemma import Answer, GemmaUnavailable
+from app.models import User
 
 client = TestClient(main.app)
 
+@pytest.fixture(autouse=True)
+def authenticated_test_user():
+    test_user = User(
+        id=1,
+        email="tester@example.com",
+        password_hash="test-only",
+    )
+
+    main.app.dependency_overrides[main.get_current_user] = (
+        lambda: test_user
+    )
+
+    yield
+
+    main.app.dependency_overrides.pop(main.get_current_user, None)
 
 def post(question="what is this?", files=None, data=None):
     payload = {"question": question}
