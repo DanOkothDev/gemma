@@ -4,3 +4,8 @@ python-multipart
 google-genai
 python-dotenv
 httpx
+sqlalchemy
+alembic
+psycopg[binary]
+pwdlib[argon2]
+PyJWT
