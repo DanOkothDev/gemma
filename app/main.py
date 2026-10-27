@@ -1,13 +1,37 @@
 import logging
+import os
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import Body, FastAPI, File, Form, HTTPException, Response, UploadFile
+from fastapi import (
+    Body,
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+)
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
+from app.auth import (
+    SESSION_DURATION_DAYS,
+    create_session,
+    get_user_from_session,
+    hash_password,
+    revoke_session,
+    verify_password,
+)
+
+from app.database import get_db
 from app.do_ai import (
     DigitalOceanAIError,
     ask_digitalocean_ai,
@@ -22,6 +46,9 @@ from app.gemma import (
     load_system_prompt,
     parse_json_payload,
 )
+from app.models import User
+from app.schemas import LoginRequest, RegisterRequest
+
 
 log = logging.getLogger(__name__)
 
@@ -38,6 +65,37 @@ MAX_QUESTION_CHARS = 2000
 app = FastAPI(title="RxGuard - Visual Medication Safety Copilot & Hermes Agent")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
+def get_current_user(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> User:
+    token = request.cookies.get("rxguard_session")
+
+    if not token:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required.",
+        )
+
+    user = get_user_from_session(db, token)
+
+    if user is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired session.",
+        )
+
+    return user
+
+@app.get("/api/auth/me")
+def get_me(
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "is_active": current_user.is_active,
+    }
 
 @app.get("/")
 def index() -> FileResponse:
@@ -48,9 +106,114 @@ def index() -> FileResponse:
 def health() -> dict:
     return {"status": "ok"}
 
+@app.post("/api/auth/register", status_code=201)
+def register(
+    payload: RegisterRequest,
+    db: Session = Depends(get_db),
+) -> dict:
+    email = str(payload.email).strip().lower()
+
+    existing_user = db.scalar(
+        select(User).where(User.email == email)
+    )
+
+    if existing_user is not None:
+        raise HTTPException(409, "An account with this email already exists.")
+
+    user = User(
+        email=email,
+        password_hash=hash_password(payload.password),
+    )
+
+    db.add(user)
+
+    try:
+        db.commit()
+        db.refresh(user)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            409,
+            "An account with this email already exists.",
+        )
+
+    return {
+        "id": user.id,
+        "email": user.email,
+        "is_active": user.is_active,
+    }
+
+@app.post("/api/auth/login")
+def login(
+    payload: LoginRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> dict:
+    email = str(payload.email).strip().lower()
+
+    user = db.scalar(
+        select(User).where(User.email == email)
+    )
+
+    if (
+        user is None
+        or not user.is_active
+        or not verify_password(payload.password, user.password_hash)
+    ):
+        raise HTTPException(401, "Invalid email or password.")
+
+    token, session = create_session(db, user)
+
+    secure_cookie = os.getenv("RXGUARD_COOKIE_SECURE", "false").lower() == "true"
+
+    response.set_cookie(
+        key="rxguard_session",
+        value=token,
+        max_age=SESSION_DURATION_DAYS * 24 * 60 * 60,
+        httponly=True,
+        secure=secure_cookie,
+        samesite="lax",
+        path="/",
+    )
+
+    return {
+        "message": "Login successful.",
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "is_active": user.is_active,
+        },
+    }
+
+@app.post("/api/auth/logout")
+def logout(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> dict:
+    token = request.cookies.get("rxguard_session")
+
+    if token:
+        revoke_session(db, token)
+
+    secure_cookie = (
+        os.getenv("RXGUARD_COOKIE_SECURE", "false").lower() == "true"
+    )
+
+    response.delete_cookie(
+        key="rxguard_session",
+        path="/",
+        httponly=True,
+        secure=secure_cookie,
+        samesite="lax",
+    )
+
+    return {"message": "Logout successful."}
 
 @app.get("/api/status/integrations")
-def integrations_status() -> dict:
+def integrations_status(
+    current_user: User = Depends(get_current_user),
+) -> dict:
     """Return status of AI providers and Hermes Agent integration."""
     return {
         "gemini_gemma": True,
@@ -106,7 +269,10 @@ END:VCALENDAR""".replace("\n\n", "\n")
 
 
 @app.post("/api/calendar/export")
-def export_calendar(schedule: dict = Body(...)) -> Response:
+def export_calendar(
+    schedule: dict = Body(...),
+    current_user: User = Depends(get_current_user),
+) -> Response:
     """Export medication daily schedule as an iCalendar (.ics) download."""
     ics_text = generate_ics(schedule)
     return Response(
@@ -117,13 +283,19 @@ def export_calendar(schedule: dict = Body(...)) -> Response:
 
 
 @app.post("/api/hermes/dispatch")
-def dispatch_hermes_alert(payload: Dict[str, Any] = Body(...)) -> dict:
+def dispatch_hermes_alert(
+    payload: Dict[str, Any] = Body(...),
+    current_user: User = Depends(get_current_user),
+) -> dict:
     """Dispatch high-risk medication alert to 24/7 Hermes Caregiver Agent on DigitalOcean."""
     return dispatch_to_hermes(payload)
 
 
 @app.post("/api/do/ask")
-def ask_do(payload: Dict[str, Any] = Body(...)) -> dict:
+def ask_do(
+    payload: Dict[str, Any] = Body(...),
+    current_user: User = Depends(get_current_user),
+) -> dict:
     """Run medication safety reasoning on DigitalOcean Serverless Inference."""
     question = payload.get("question", "").strip()
     if not question:
@@ -135,7 +307,6 @@ def ask_do(payload: Dict[str, Any] = Body(...)) -> dict:
     except DigitalOceanAIError as exc:
         raise HTTPException(502, str(exc))
 
-
 # A plain `def` (not async) on purpose: FastAPI runs it in a worker thread, and
 # ask_gemma blocks on network calls and sleeps between retries.
 @app.post("/api/ask")
@@ -144,6 +315,7 @@ def ask(
     engine: Optional[str] = Form("gemini"),
     image: Optional[UploadFile] = File(None),
     images: Optional[List[UploadFile]] = File(None),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
     question = question.strip()
     if not question:

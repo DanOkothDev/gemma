@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Any, Optional
 
 from sqlalchemy import (
@@ -49,6 +49,10 @@ class User(Base):
     assessments: Mapped[list["Assessment"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
+    )
+    sessions: Mapped[list["UserSession"]] = relationship(
+    back_populates="user",
+    cascade="all, delete-orphan",
     )
 
 
@@ -122,3 +126,39 @@ class Assessment(Base):
     )
 
     user: Mapped["User"] = relationship(back_populates="assessments")
+
+class UserSession(Base):
+    __tablename__ = "user_sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+
+    token_hash: Mapped[str] = mapped_column(
+        String(64),
+        unique=True,
+        index=True,
+        nullable=False,
+    )
+
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    created_at: Mapped[Any] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    user: Mapped["User"] = relationship(back_populates="sessions")
