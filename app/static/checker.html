@@ -1,0 +1,803 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RxGuard: medication safety check</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f7f6;--surface:#fff;--ink:#0e2420;--muted:#586c67;--line:#dae3e0;
+  --brand:#0f766e;--brand-ink:#fff;--soft:#e7f1ee;
+  --danger:#c2362b;--danger-bg:#fcebe9;--warn:#a96a0a;--warn-bg:#fdf3df;--ok:#0f7a4f;--ok-bg:#e4f4ec;
+  --fs:16px;--r:14px;
+  --display:'Bricolage Grotesque',system-ui,sans-serif;--body:'Hanken Grotesk',system-ui,sans-serif;
+}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --bg:#0a1210;--surface:#111c19;--ink:#e8f1ee;--muted:#93a9a3;--line:#223530;
+  --brand:#2dd4bf;--brand-ink:#052a25;--soft:#152824;
+  --danger:#f2766b;--danger-bg:#2c1614;--warn:#e6b04f;--warn-bg:#2a2010;--ok:#4cc38a;--ok-bg:#112a1f;}}
+body.senior{--fs:19px;--muted:var(--ink);--line:color-mix(in srgb,var(--ink) 35%,transparent)}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font:400 var(--fs)/1.6 var(--body);background:var(--bg);color:var(--ink);min-height:100vh}
+button,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+.wrap{max-width:1040px;margin:0 auto;padding:0 1.5rem}
+
+/* header */
+header{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 85%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:center;justify-content:space-between;height:60px;gap:1rem}
+.brand{font:800 1.25rem var(--display);letter-spacing:-.02em;display:flex;align-items:center;gap:.6rem}
+.mark{width:28px;height:28px;border-radius:50%;background:linear-gradient(90deg,var(--brand) 50%,var(--soft) 50%);border:2px solid var(--brand);transform:rotate(-35deg)}
+.nav{display:flex;gap:.5rem}
+.btn{border:1px solid var(--line);background:var(--surface);padding:.45rem .9rem;border-radius:999px;font-weight:600;font-size:.85rem;cursor:pointer;transition:border-color .2s,background .2s,transform .2s}
+.btn:hover{border-color:var(--brand)}
+.btn:active{transform:scale(.97)}
+.btn.on{background:var(--soft);border-color:var(--brand);color:var(--brand)}
+
+/* hero */
+.hero{padding:4rem 0 2rem;max-width:720px}
+.hero h1{font:800 clamp(2.2rem,6vw,3.6rem)/1.05 var(--display);letter-spacing:-.035em;margin-bottom:1rem}
+.hero p{color:var(--muted);font-size:1.1rem;max-width:56ch}
+.hero h1 span{display:inline-block;opacity:0;transform:translateY(.4em);animation:rise .7s cubic-bezier(.2,.7,.2,1) forwards}
+.hero h1 span:nth-child(2){animation-delay:.12s}.hero h1 span:nth-child(3){animation-delay:.24s}
+@keyframes rise{to{opacity:1;transform:none}}
+
+/* checker */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:1.5rem;margin-bottom:2.5rem}
+.field{margin-bottom:1.25rem}
+.field>label,.lbl{display:block;font-weight:700;font-size:.92rem;margin-bottom:.5rem}
+.drop{position:relative;border:1.5px dashed var(--line);border-radius:12px;padding:1.75rem 1rem;text-align:center;overflow:hidden;transition:border-color .25s,background .25s}
+.drop:hover,.drop.dragover{border-color:var(--brand);background:var(--soft)}
+.drop svg{width:28px;height:28px;stroke:var(--brand);margin-bottom:.4rem}
+.drop strong{display:block;font-size:.95rem}
+.drop small{color:var(--muted);font-size:.8rem}
+.drop input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.drop::after{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:var(--brand);box-shadow:0 0 14px var(--brand);opacity:0}
+body.busy .drop::after{opacity:1;animation:scan 1.6s ease-in-out infinite alternate}
+@keyframes scan{from{top:0}to{top:calc(100% - 2px)}}
+.thumbs{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:.9rem}
+.thumb{position:relative;width:80px;height:80px;border-radius:10px;overflow:hidden;border:1px solid var(--line);animation:pop .25s ease-out}
+@keyframes pop{from{transform:scale(.85);opacity:0}}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.thumb button{position:absolute;top:4px;right:4px;width:22px;height:22px;border:0;border-radius:50%;background:rgba(0,0,0,.65);color:#fff;cursor:pointer;line-height:1}
+textarea{width:100%;min-height:5.5rem;padding:.8rem 1rem;background:var(--bg);border:1px solid var(--line);border-radius:10px;resize:vertical;transition:border-color .2s}
+textarea:focus{outline:none;border-color:var(--brand)}
+.examples{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.6rem;font-size:.82rem;color:var(--muted)}
+.chip{border:1px solid var(--line);background:transparent;border-radius:999px;padding:.25rem .75rem;font-size:.8rem;cursor:pointer;transition:all .2s}
+.chip:hover{border-color:var(--brand);color:var(--brand)}
+.engine{display:flex;flex-wrap:wrap;gap:.5rem}
+.engine label{display:flex;align-items:center;gap:.5rem;border:1px solid var(--line);border-radius:10px;padding:.5rem .9rem;font-size:.88rem;font-weight:600;cursor:pointer;margin:0;transition:all .2s}
+.engine label:has(input:checked){border-color:var(--brand);background:var(--soft)}
+.engine input{accent-color:var(--brand)}
+.actions{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-top:1.5rem}
+.link{background:none;border:0;color:var(--brand);font-weight:700;cursor:pointer;padding:.5rem 0}
+.link:hover{text-decoration:underline}
+.go{background:var(--brand);color:var(--brand-ink);border:0;padding:.8rem 1.6rem;border-radius:999px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:.6rem;transition:transform .2s,filter .2s}
+.go:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.go:disabled{opacity:.7;cursor:wait}
+.spin{display:none;width:16px;height:16px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:rot .7s linear infinite}
+.go:disabled .spin{display:inline-block}
+@keyframes rot{to{transform:rotate(360deg)}}
+#status-card{display:none;margin:-1.25rem 0 2rem;color:var(--muted);font-size:.92rem}
+#status-card::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--brand);margin-right:.6rem;animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.25}}
+
+/* results */
+#results-section{display:none}
+#results-section.show>*{animation:rise .5s cubic-bezier(.2,.7,.2,1) both}
+#results-section.show>*:nth-child(2){animation-delay:.08s}
+#results-section.show>*:nth-child(n+3){animation-delay:.16s}
+.banner{display:flex;gap:1.25rem;align-items:flex-start;padding:1.5rem;border-radius:var(--r);border:1px solid;margin-bottom:1.25rem}
+.banner .ring{flex:none;width:46px;height:46px;border-radius:50%;border:3px solid currentColor;display:grid;place-items:center;font:800 1.3rem var(--display)}
+.banner.safe{background:var(--ok-bg);color:var(--ok);border-color:color-mix(in srgb,var(--ok) 35%,transparent)}
+.banner.warning{background:var(--warn-bg);color:var(--warn);border-color:color-mix(in srgb,var(--warn) 35%,transparent)}
+.banner.danger{background:var(--danger-bg);color:var(--danger);border-color:color-mix(in srgb,var(--danger) 35%,transparent)}
+.banner.danger .ring{animation:ping 1.8s ease-out infinite}
+@keyframes ping{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--danger) 45%,transparent)}100%{box-shadow:0 0 0 16px transparent}}
+.banner h2{font:700 1.4rem/1.25 var(--display);letter-spacing:-.02em;margin:.1rem 0 .35rem}
+.banner p{color:var(--ink);opacity:.85;font-size:.95rem}
+.banner .tag{font-weight:700;font-size:.8rem}
+.voice{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:1rem 1.25rem;margin-bottom:2.25rem}
+.voice h4{font-size:.95rem}.voice p{font-size:.82rem;color:var(--muted)}
+.voice-btns{display:flex;gap:.5rem}
+#btn-play-voice.playing{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+h3.sec{font:700 1.2rem var(--display);letter-spacing:-.015em;margin:0 0 .9rem}
+.list{display:flex;flex-direction:column;gap:.7rem;margin-bottom:2.25rem}
+.conflict{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--muted);border-radius:10px;padding:1rem 1.2rem}
+.conflict.high{border-left-color:var(--danger)}.conflict.medium{border-left-color:var(--warn)}.conflict.low{border-left-color:var(--ok)}
+.conflict-h{display:flex;justify-content:space-between;gap:1rem;align-items:center;margin-bottom:.3rem}
+.conflict-h b{font-size:1rem}
+.sev{font-size:.75rem;font-weight:700;padding:.15rem .55rem;border-radius:999px;white-space:nowrap}
+.sev.high{background:var(--danger-bg);color:var(--danger)}.sev.medium{background:var(--warn-bg);color:var(--warn)}.sev.low{background:var(--ok-bg);color:var(--ok)}
+.conflict p{color:var(--muted);font-size:.9rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:.9rem;margin-bottom:2.25rem}
+.med{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1.2rem;transition:border-color .2s,transform .2s}
+.med:hover{border-color:var(--brand);transform:translateY(-2px)}
+.med-h{display:flex;justify-content:space-between;gap:.75rem;align-items:baseline}
+.med-n{font:700 1.1rem var(--display)}
+.med-d{font-size:.8rem;font-weight:700;color:var(--brand);background:var(--soft);padding:.15rem .6rem;border-radius:999px;white-space:nowrap}
+.med-g{font-size:.85rem;color:var(--muted);margin:.1rem 0 .7rem}
+.med-p{font-size:.86rem;margin-bottom:.25rem}
+.med-w{display:block;font-size:.8rem;color:var(--warn);margin-top:.3rem}
+.day{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:0;margin-bottom:2.25rem;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--surface)}
+.slot{padding:1.1rem 1.2rem;border-right:1px solid var(--line);border-bottom:1px solid var(--line);margin:0 -1px -1px 0}
+.slot h4{font-size:.95rem;margin-bottom:.1rem}
+.slot time{display:block;font-size:.78rem;color:var(--muted);margin-bottom:.7rem}
+.slot ul{list-style:none;display:flex;flex-direction:column;gap:.45rem}
+.slot li{background:var(--soft);border-radius:8px;padding:.5rem .7rem;font-size:.84rem;line-height:1.4}
+.slot li.none{background:none;padding:0;color:var(--muted);font-style:italic}
+.cta{display:flex;flex-wrap:wrap;gap:.7rem;margin-bottom:1.5rem}
+.cta .btn{padding:.7rem 1.2rem;font-size:.92rem}
+.cta .main{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.meta{display:flex;justify-content:space-between;flex-wrap:wrap;gap:.5rem;border-top:1px solid var(--line);padding-top:1rem;font-size:.8rem;color:var(--muted)}
+footer{padding:2rem 0 3rem}
+
+/* modals */
+.overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(5,12,10,.6);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:1.25rem}
+.overlay.open{display:flex}
+.overlay.open .modal{animation:modal .25s cubic-bezier(.2,.8,.3,1)}
+@keyframes modal{from{opacity:0;transform:translateY(14px) scale(.98)}}
+.modal{background:var(--surface);color:var(--ink);width:100%;max-width:620px;max-height:90vh;overflow:auto;border-radius:var(--r);padding:1.75rem}
+.modal-h{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding-bottom:.9rem;margin-bottom:1.2rem}
+.modal-h h3{font:700 1.2rem var(--display)}
+.x{background:none;border:0;font-size:1.6rem;line-height:1;cursor:pointer;color:var(--muted)}
+.mf{margin-bottom:1rem}.mf .lbl{font-size:.75rem;color:var(--muted);margin-bottom:.15rem}.mf p{font-size:.95rem}
+.em .mf:first-of-type p{font-weight:700;color:var(--danger)}
+.code{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:.7rem .9rem;font:.78rem ui-monospace,Menlo,monospace;overflow-x:auto;white-space:nowrap}
+.opt{border:1px solid var(--line);border-radius:10px;padding:1rem;margin-bottom:.9rem}
+.opt b{display:block;margin-bottom:.25rem}.opt p{font-size:.85rem;color:var(--muted);margin-bottom:.7rem}
+.mfoot{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-top:1.25rem;font-size:.82rem;color:var(--ok)}
+.print{background:var(--ink);color:var(--bg);border:0;padding:.6rem 1.2rem;border-radius:999px;font-weight:700;cursor:pointer}
+
+/* Cookie consent banner */
+.cookie-banner {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 300;
+  display: none;
+  padding: 1rem;
+  background: var(--surface);
+  color: var(--ink);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, .12);
+}
+
+.cookie-banner.visible {
+  display: block;
+}
+
+.cookie-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.cookie-copy {
+  flex: 1 1 300px;
+}
+
+.cookie-copy h3 {
+  font: 700 1rem var(--display);
+  margin-bottom: .35rem;
+}
+
+.cookie-copy p {
+  color: var(--muted);
+  font-size: .88rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.cookie-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+
+.cookie-actions button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: .65rem 1rem;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: .85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cookie-actions .cookie-accept {
+  background: var(--brand);
+  color: var(--brand-ink);
+  border-color: var(--brand);
+}
+
+.cookie-actions button:focus-visible {
+  outline: 3px solid var(--brand);
+  outline-offset: 3px;
+}
+
+@media(max-width:560px) {
+  .cookie-actions {
+    width: 100%;
+  }
+
+  .cookie-actions button {
+    flex: 1;
+  }
+}
+@media(max-width:560px){.hero{padding-top:2.5rem}.nav .btn span{display:none}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.hero h1 span{opacity:1;transform:none}}
+@media print{body *{visibility:hidden}.em,.em *{visibility:visible}.em{position:absolute;inset:0;max-width:none;max-height:none;background:#fff;color:#000}.mfoot,.x,.print{display:none}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap bar">
+    <div class="brand"><span class="mark" aria-hidden="true"></span>RxGuard</div>
+    <div class="nav">
+      <button id="btn-open-hermes" class="btn" type="button">Deploy agent</button>
+      <button id="btn-senior" class="btn" type="button" aria-pressed="false">Large text</button>
+      <button id="btn-logout" class="btn" type="button">Logout</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <h1><span>Check</span> <span>your medicines</span> <span>before you take them.</span></h1>
+    <p>Photograph your pill bottles or describe what you take. RxGuard flags dangerous combinations, duplicate ingredients and food clashes, then builds a daily schedule.</p>
+  </section>
+
+  <section class="panel">
+    <form id="rx-form">
+      <div class="field">
+        <label for="images-input">Medication photos</label>
+        <div class="drop" id="dropzone">
+          <input type="file" id="images-input" multiple accept="image/jpeg,image/png,image/webp">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+          <strong>Drop photos of bottles or blister packs</strong>
+          <small>JPEG, PNG or WebP, up to 8 MB each</small>
+        </div>
+        <div class="thumbs" id="thumbnails-grid"></div>
+      </div>
+
+      <div class="field">
+        <label for="question">Questions or context (optional)</label>
+        <textarea id="question" name="question" placeholder="Can I take these together? Any foods I should avoid?"></textarea>
+        <div class="examples">
+          <span>Try an example:</span>
+          <button type="button" class="chip" onclick="loadPreset('overdose')">Duplicate painkillers</button>
+          <button type="button" class="chip" onclick="loadPreset('spacing')">Timing and food</button>
+          <button type="button" class="chip" onclick="loadPreset('safe')">Routine regimen</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="lbl">Analysis engine</span>
+        <div class="engine">
+          <label><input type="radio" name="engine" value="gemini" checked> Google Gemma 4 (multimodal)</label>
+          <label><input type="radio" name="engine" value="digitalocean"> DigitalOcean Serverless AI (Llama 3.3)</label>
+        </div>
+      </div>
+
+      <div class="actions">
+        <label class="link" for="images-input">Add or take a photo</label>
+        <button type="submit" class="go" id="btn-submit"><span class="spin"></span><span id="btn-text">Check my medications</span></button>
+      </div>
+    </form>
+  </section>
+
+  <div id="status-card"><span id="status-msg">Cross-referencing medications…</span></div>
+
+  <section id="results-section" aria-live="polite">
+    <div id="safety-banner" class="banner safe">
+      <div class="ring" id="banner-icon">&#10003;</div>
+      <div>
+        <span class="tag" id="banner-score">SAFE</span>
+        <h2 id="banner-title">No immediate interactions found</h2>
+        <p id="banner-desc">All identified medications appear compatible under standard dosing.</p>
+      </div>
+    </div>
+
+    <div class="voice">
+      <div>
+        <h4>Spoken explanation</h4>
+        <p id="audio-caption">Listen to a plain-language summary.</p>
+      </div>
+      <div class="voice-btns">
+        <button id="btn-play-voice" class="btn" type="button">Play</button>
+        <button id="btn-stop-voice" class="btn" type="button" style="display:none">Stop</button>
+      </div>
+    </div>
+
+    <h3 class="sec">Conflicts and alerts</h3>
+    <div class="list" id="conflicts-list"></div>
+
+    <h3 class="sec">Identified medications</h3>
+    <div class="grid" id="medications-grid"></div>
+
+    <h3 class="sec">Daily schedule</h3>
+    <div class="day">
+      <div class="slot"><h4>Morning</h4><time>8:00 AM</time><ul id="slot-morning"></ul></div>
+      <div class="slot"><h4>Afternoon</h4><time>1:00 PM</time><ul id="slot-afternoon"></ul></div>
+      <div class="slot"><h4>Evening</h4><time>6:00 PM</time><ul id="slot-evening"></ul></div>
+      <div class="slot"><h4>Bedtime</h4><time>10:00 PM</time><ul id="slot-bedtime"></ul></div>
+    </div>
+
+    <div class="cta">
+      <button class="btn main" id="btn-calendar-export" type="button">Add to calendar (.ics)</button>
+      <button class="btn" id="btn-open-emergency" type="button">Emergency card</button>
+      <button class="btn" id="btn-dispatch-hermes" type="button">Send alert to Hermes agent</button>
+    </div>
+
+    <div class="meta">
+      <span>Model: <b id="meta-model">gemma-4-26b-a4b-it</b></span>
+      <span>Attempts: <b id="meta-attempts">1</b></span>
+      <span>Educational demo. Confirm with a licensed pharmacist.</span>
+    </div>
+  </section>
+</main>
+
+<!-- Emergency card -->
+<div class="overlay" id="emergency-modal-overlay">
+  <div class="modal em" role="dialog" aria-modal="true" aria-label="Emergency medication card">
+    <div class="modal-h"><h3>Emergency medication card</h3><button class="x" id="btn-close-modal" aria-label="Close">&times;</button></div>
+    <div class="mf"><div class="lbl">Priority action</div><p id="em-action">Routine medication regimen.</p></div>
+    <div class="mf"><div class="lbl">Active medications and doses</div><p id="em-meds">None registered</p></div>
+    <div class="mf"><div class="lbl">Allergies and contraindications</div><p id="em-contraindications">None reported</p></div>
+    <div class="mf"><div class="lbl">Notes for responders</div><p id="em-notes">Generated by RxGuard.</p></div>
+    <div class="mfoot"><span></span><button class="print" onclick="window.print()">Print card</button></div>
+  </div>
+</div>
+
+<!-- Hermes -->
+<div class="overlay" id="hermes-modal-overlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Deploy Hermes agent">
+    <div class="modal-h"><h3>Deploy the Hermes agent</h3><button class="x" id="btn-close-hermes" aria-label="Close">&times;</button></div>
+    <p style="color:var(--muted);font-size:.9rem;margin-bottom:1.1rem">Run Nous Research’s Hermes agent on a DigitalOcean Droplet, connected to Serverless Inference at <code>https://inference.do-ai.run/v1</code>.</p>
+    <div class="opt"><b>Marketplace Droplet</b><p>A preconfigured Ubuntu Droplet with persistent memory, tool execution and Telegram or Discord caregiver alerts.</p>
+      <a class="btn main" style="text-decoration:none;display:inline-block;background:var(--brand);color:var(--brand-ink);border-color:var(--brand)" href="https://cloud.digitalocean.com/droplets/new?image=hermes-agent" target="_blank" rel="noopener">Launch Droplet</a></div>
+    <div class="opt"><b>Setup script</b><p>On a fresh Ubuntu Droplet, run:</p>
+      <div class="code">curl -sSL https://raw.githubusercontent.com/clencyc/gemma-demo/main/scripts/deploy_hermes_droplet.sh | bash</div></div>
+    <div class="mfoot"><span id="hermes-status-text">Ready for DigitalOcean Serverless Inference</span><button class="btn" id="btn-test-hermes" type="button">Test connection</button></div>
+  </div>
+</div>
+
+<section
+  id="cookie-banner"
+  class="cookie-banner"
+  role="region"
+  aria-label="Cookie preferences"
+  aria-describedby="cookie-description"
+>
+  <div class="cookie-inner">
+    <div class="cookie-copy">
+      <h3>Privacy and cookies</h3>
+      <p id="cookie-description">
+        Essential cookies support secure sign-in and account security.
+        Optional analytics cookies will remain disabled unless you choose
+        to allow them. You can change your preferences at any time.
+      </p>
+    </div>
+
+    <div class="cookie-actions">
+      <button type="button" id="cookie-settings">
+        Cookie settings
+      </button>
+      <button type="button" id="cookie-reject">
+        Reject optional
+      </button>
+      <button type="button" id="cookie-accept" class="cookie-accept">
+        Accept optional
+      </button>
+    </div>
+  </div>
+</section>
+
+<footer class="wrap meta" style="border:0"><span>RxGuard</span></footer>
+
+<script>
+let selectedFiles = [], currentStructuredData = null;
+const $ = (id) => document.getElementById(id);
+
+let csrfToken = null;
+
+async function getCsrfToken() {
+  if (csrfToken) return csrfToken;
+
+  const response = await fetch("/api/auth/csrf");
+  const data = await response.json();
+
+  if (!response.ok || !data.csrf_token) {
+    throw new Error("Could not obtain a security token. Please log in again.");
+  }
+
+  csrfToken = data.csrf_token;
+  return csrfToken;
+}
+
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+const dropzone = $("dropzone"), fileInput = $("images-input"), thumbs = $("thumbnails-grid"),
+  form = $("rx-form"), questionEl = $("question"), btnSubmit = $("btn-submit"),
+  statusCard = $("status-card"), statusMsg = $("status-msg"), results = $("results-section"),
+  btnPlay = $("btn-play-voice"), btnStop = $("btn-stop-voice"),
+  emModal = $("emergency-modal-overlay"), hermesModal = $("hermes-modal-overlay");
+
+// Large text toggle
+const btnSenior = $("btn-senior");
+btnSenior.addEventListener("click", () => {
+  const on = document.body.classList.toggle("senior");
+  btnSenior.classList.toggle("on", on);
+  btnSenior.setAttribute("aria-pressed", on);
+});
+
+// Logout
+$("btn-logout").addEventListener("click", async () => {
+  const button = $("btn-logout");
+  button.disabled = true;
+
+  try {
+    const token = await getCsrfToken();
+
+    const response = await fetch("/api/auth/logout", {
+      method: "POST",
+      headers: {
+        "X-CSRF-Token": token
+      }
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.detail || "Logout failed.");
+    }
+
+    csrfToken = null;
+    window.location.replace("/login");
+  } catch (error) {
+    alert(error.message || "Unable to log out. Please try again.");
+    button.disabled = false;
+  }
+});
+
+// Files
+fileInput.addEventListener("change", e => { handleFiles([...e.target.files]); fileInput.value = ""; });
+dropzone.addEventListener("dragover", e => { e.preventDefault(); dropzone.classList.add("dragover"); });
+dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+dropzone.addEventListener("drop", e => {
+  e.preventDefault(); dropzone.classList.remove("dragover");
+  if (e.dataTransfer.files.length) handleFiles([...e.dataTransfer.files]);
+});
+function handleFiles(files) {
+  files.filter(f => f.type.startsWith("image/")).forEach(f => selectedFiles.push(f));
+  renderThumbs();
+}
+function renderThumbs() {
+  thumbs.innerHTML = "";
+  selectedFiles.forEach((file, i) => {
+    const w = document.createElement("div"); w.className = "thumb";
+    const img = document.createElement("img"); img.src = URL.createObjectURL(file); img.alt = "Selected medication photo";
+    const b = document.createElement("button"); b.type = "button"; b.innerHTML = "&times;"; b.setAttribute("aria-label", "Remove photo");
+    b.onclick = e => { e.stopPropagation(); selectedFiles.splice(i, 1); renderThumbs(); };
+    w.append(img, b); thumbs.appendChild(w);
+  });
+}
+
+// Examples
+const PRESETS = {
+  overdose: "I took a Percocet (Oxycodone/Acetaminophen 5/325mg) for knee surgery pain, and I just took Extra Strength Tylenol (500mg) and NyQuil Severe Cold for flu symptoms. Can I take these together?",
+  spacing: "I take Synthroid (Levothyroxine 75mcg) first thing in the morning with a Calcium + Vitamin D supplement. I also drink fresh grapefruit juice with breakfast and take Lipitor (Atorvastatin 20mg). Is this safe?",
+  safe: "I have been prescribed Metformin 500mg twice daily with meals for diabetes, and Lisinopril 10mg once daily in the morning for blood pressure. Can you check my regimen and create my daily schedule?"
+};
+function loadPreset(key) {
+  if (!PRESETS[key]) return;
+  questionEl.value = PRESETS[key];
+  selectedFiles = []; renderThumbs();
+  form.scrollIntoView({ behavior: "smooth" });
+  setTimeout(() => form.requestSubmit(), 200);
+}
+
+// Submit
+form.addEventListener("submit", async e => {
+  e.preventDefault();
+  const question = questionEl.value.trim();
+  if (!question && !selectedFiles.length) { alert("Enter a question or add a medication photo."); return; }
+  const engine = document.querySelector('input[name="engine"]:checked')?.value || "gemini";
+
+  btnSubmit.disabled = true;
+  document.body.classList.add("busy");
+  statusCard.style.display = "block";
+  results.style.display = "none"; results.classList.remove("show");
+  statusMsg.textContent = engine === "digitalocean"
+    ? "Calling DigitalOcean Serverless Inference…"
+    : "Calling Gemma multimodal reasoning…";
+
+  const fd = new FormData();
+  fd.append("question", question || "Please identify the medications in this photo and check for interactions, duplicate ingredients, and dosing schedule.");
+  fd.append("engine", engine);
+  if (selectedFiles.length === 1) fd.append("image", selectedFiles[0]);
+  else selectedFiles.forEach(f => fd.append("images", f));
+
+  try {
+    const token = await getCsrfToken();
+
+    const res = await fetch("/api/ask", {
+      method: "POST",
+      headers: { "X-CSRF-Token": token },
+      body: fd
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Server request failed (" + res.status + ")");
+    currentStructuredData = data.data || null;
+    renderDashboard(data);
+  } catch (err) {
+    alert("Error: " + err.message);
+  } finally {
+    btnSubmit.disabled = false;
+    document.body.classList.remove("busy");
+    statusCard.style.display = "none";
+  }
+});
+
+function renderDashboard(api) {
+  const data = api.data || {};
+  $("meta-model").textContent = api.model || "gemma-4-26b-a4b-it";
+  $("meta-attempts").textContent = api.attempts || 1;
+
+  const allowedScores = ["SAFE", "CAUTION", "DANGER", "UNVERIFIED"];
+  const reportedScore = String(data.safety_score || "").toUpperCase();
+
+  const score =
+    allowedScores.includes(reportedScore) && reportedScore !== "SAFE"
+      ? reportedScore
+      : "UNVERIFIED";
+
+  const cls =
+    score === "DANGER"
+      ? "danger"
+      : score === "CAUTION"
+        ? "warning"
+        : "warning";
+
+  $("safety-banner").className = "banner " + cls;
+  $("banner-score").textContent = score;
+  $("banner-icon").textContent = score === "SAFE" ? "\u2713" : "!";
+
+  $("banner-title").textContent =
+    data.headline ||
+    (
+      score === "DANGER"
+        ? "Potential high-risk medication conflict"
+        : score === "CAUTION"
+          ? "Medication warning requires attention"
+          : "Medication safety has not been verified"
+    );
+
+  $("banner-desc").textContent =
+    data.audio_summary ||
+    api.answer ||
+    "No reliable safety assessment is available. Verify your medications with a pharmacist.";
+
+  const cl = $("conflicts-list"); cl.innerHTML = "";
+  const conflicts = data.conflicts_and_warnings || [];
+  if (!conflicts.length) {
+  cl.innerHTML = `
+    <div class="conflict medium">
+      <div class="conflict-h">
+        <b>Assessment incomplete</b>
+      </div>
+      <p>
+        No warnings were returned. This does not confirm that the
+        medication regimen is safe. Verify the results with a pharmacist.
+      </p>
+    </div>`;
+  } else conflicts.forEach(c => {
+    const sev = (c.severity || "LOW").toLowerCase();
+    const d = document.createElement("div"); d.className = "conflict " + sev;
+    d.innerHTML = `<div class="conflict-h"><b>${esc(c.title || "Clinical notice")}</b><span class="sev ${sev}">${esc(c.severity || "INFO")}</span></div><p>${esc(c.description)}</p>`;
+    cl.appendChild(d);
+  });
+
+  const mg = $("medications-grid"); mg.innerHTML = "";
+  const meds = data.medications || [];
+  if (!meds.length) mg.innerHTML = `<p style="color:var(--muted);font-size:.9rem">No individual medication breakdown was returned.</p>`;
+  else meds.forEach(m => {
+    const d = document.createElement("div"); d.className = "med";
+    d.innerHTML = `
+      <div class="med-h"><div class="med-n">${esc(m.name || "Medication")}</div><div class="med-d">${esc(m.dosage || "Standard")}</div></div>
+      <div class="med-g">${m.generic_name ? "Generic: " + esc(m.generic_name) : "&nbsp;"}</div>
+      <div class="med-p"><b>Frequency:</b> ${esc(m.frequency || "As prescribed")}</div>
+      <div class="med-p"><b>Instructions:</b> ${esc(m.instructions || "Follow label directions")}</div>
+      <div class="med-p"><b>Purpose:</b> ${esc(m.purpose || "Prescribed therapy")}</div>
+      ${(m.warnings || []).map(w => `<span class="med-w">${esc(w)}</span>`).join("")}`;
+    mg.appendChild(d);
+  });
+
+  const s = data.daily_schedule || {};
+  fillSlot("slot-morning", s.morning); fillSlot("slot-afternoon", s.afternoon);
+  fillSlot("slot-evening", s.evening); fillSlot("slot-bedtime", s.bedtime);
+
+  const em = data.emergency_card || {};
+  $("em-action").textContent = em.patient_action || "Routine medication regimen.";
+  $("em-meds").textContent = (em.active_medications || []).join(", ") || "None specified";
+  $("em-contraindications").textContent = (em.critical_allergies_or_contraindications || []).join(", ") || "None reported";
+  $("em-notes").textContent = em.clinician_notes || data.audio_summary || "Generated by RxGuard.";
+
+  results.style.display = "block";
+  void results.offsetWidth;
+  results.classList.add("show");
+  results.scrollIntoView({ behavior: "smooth" });
+}
+
+function fillSlot(id, items) {
+  const el = $(id); el.innerHTML = "";
+  if (!items || !items.length) { el.innerHTML = `<li class="none">Nothing scheduled</li>`; return; }
+  items.forEach(t => { const li = document.createElement("li"); li.textContent = t; el.appendChild(li); });
+}
+
+// Voice
+btnPlay.addEventListener("click", () => {
+  const text = currentStructuredData?.audio_summary || $("banner-desc").textContent;
+  if (text) speak(text);
+});
+btnStop.addEventListener("click", stopSpeech);
+function speak(text) {
+  if (!("speechSynthesis" in window)) { alert("Text-to-speech is not supported in this browser."); return; }
+  stopSpeech();
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = 0.95;
+  u.onstart = () => { btnPlay.classList.add("playing"); btnPlay.textContent = "Playing"; btnStop.style.display = "inline-block"; };
+  u.onend = u.onerror = stopSpeech;
+  speechSynthesis.speak(u);
+}
+function stopSpeech() {
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
+  btnPlay.classList.remove("playing"); btnPlay.textContent = "Play"; btnStop.style.display = "none";
+}
+
+// Calendar
+$("btn-calendar-export").addEventListener("click", async () => {
+  if (!currentStructuredData?.daily_schedule) { alert("No schedule available to export."); return; }
+  try {
+    const token = await getCsrfToken();
+
+    const res = await fetch("/api/calendar/export", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": token
+      },
+      body: JSON.stringify(currentStructuredData.daily_schedule)
+    });
+
+    if (!res.ok) throw new Error("Calendar export failed.");
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement("a");
+    a.href = url; a.download = "rxguard-medication-schedule.ics";
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  } catch (err) { alert("Error exporting calendar: " + err.message); }
+});
+
+// Modals
+const bind = (modal, openBtn, closeBtn) => {
+  if (openBtn) $(openBtn).addEventListener("click", () => modal.classList.add("open"));
+  $(closeBtn).addEventListener("click", () => modal.classList.remove("open"));
+  modal.addEventListener("click", e => { if (e.target === modal) modal.classList.remove("open"); });
+};
+bind(emModal, "btn-open-emergency", "btn-close-modal");
+bind(hermesModal, "btn-open-hermes", "btn-close-hermes");
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") document.querySelectorAll(".overlay.open").forEach(o => o.classList.remove("open"));
+});
+
+$("btn-test-hermes").addEventListener("click", async () => {
+  const t = $("hermes-status-text");
+  t.textContent = "Connecting to DigitalOcean Serverless Inference…";
+  try {
+    const data = await (await fetch("/api/status/integrations")).json();
+    t.textContent = "Active: " + data.do_inference_endpoint;
+  } catch { t.textContent = "Hermes agent droplet ready on DigitalOcean"; }
+});
+
+$("btn-dispatch-hermes").addEventListener("click", async () => {
+  if (!currentStructuredData) { alert("Run an analysis first to generate an alert."); return; }
+  try {
+    const token = await getCsrfToken();
+
+    const res = await fetch("/api/hermes/dispatch", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": token
+      },
+      body: JSON.stringify(currentStructuredData)
+    });
+    const data = await res.json();
+    alert(data.message || "Alert delivered to the Hermes agent.");
+  } catch (err) { alert("Hermes dispatch: " + err.message); }
+});
+// Cookie consent
+const cookieBanner = $("cookie-banner");
+const cookieStorageKey = "rxguard-cookie-consent";
+
+function hideCookieBanner() {
+  cookieBanner.classList.remove("visible");
+}
+
+function showCookieBanner() {
+  cookieBanner.classList.add("visible");
+}
+
+function saveCookieConsent(allowAnalytics) {
+  const consent = {
+    essential: true,
+    analytics: allowAnalytics,
+    updatedAt: new Date().toISOString()
+  };
+
+  localStorage.setItem(cookieStorageKey, JSON.stringify(consent));
+  hideCookieBanner();
+}
+
+function openCookieSettings() {
+  const saved = localStorage.getItem(cookieStorageKey);
+  let analyticsAllowed = false;
+
+  if (saved) {
+    try {
+      analyticsAllowed = JSON.parse(saved).analytics === true;
+    } catch {
+      analyticsAllowed = false;
+    }
+  }
+
+  const allow = window.confirm(
+    "Essential cookies are required for secure sign-in. " +
+    "Optional analytics cookies are currently not enabled in RxGuard. " +
+    "Choose OK to allow optional analytics if introduced, or Cancel to keep them disabled."
+  );
+
+  if (allow) {
+    saveCookieConsent(true);
+  } else {
+    saveCookieConsent(false);
+  }
+}
+
+$("cookie-accept").addEventListener("click", () => {
+  saveCookieConsent(true);
+});
+
+$("cookie-reject").addEventListener("click", () => {
+  saveCookieConsent(false);
+});
+
+$("cookie-settings").addEventListener("click", openCookieSettings);
+
+try {
+  const savedConsent = localStorage.getItem(cookieStorageKey);
+
+  if (savedConsent) {
+    JSON.parse(savedConsent);
+    hideCookieBanner();
+  } else {
+    showCookieBanner();
+  }
+} catch {
+  showCookieBanner();
+}
+</script>
+</body>
+</html>

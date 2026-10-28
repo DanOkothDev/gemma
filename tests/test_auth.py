@@ -13,7 +13,12 @@ from app.models import User, UserSession
 
 
 @pytest.fixture
-def auth_client():
+def auth_client(monkeypatch):
+    monkeypatch.setenv(
+        "RXGUARD_CSRF_SECRET",
+        "test-only-csrf-secret-that-is-long-enough-123456",
+    )
+
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -59,6 +64,13 @@ def test_register_creates_user_with_hashed_password(auth_client):
     assert response.status_code == 201
     assert response.json()["email"] == "dan@example.com"
     assert response.json()["is_active"] is True
+
+    assert response.json()["message"] == "Registration successful."
+    assert "rxguard_session" in response.cookies
+
+    me_response = auth_client.get("/api/auth/me")
+    assert me_response.status_code == 200
+    assert me_response.json()["email"] == "dan@example.com"
 
     with auth_client.testing_session_local() as db:
         user = db.query(User).filter_by(
@@ -187,7 +199,14 @@ def test_logout_revokes_session(auth_client):
     me_response = auth_client.get("/api/auth/me")
     assert me_response.status_code == 200
 
-    logout_response = auth_client.post("/api/auth/logout")
+    csrf_response = auth_client.get("/api/auth/csrf")
+    assert csrf_response.status_code == 200
+    csrf_token = csrf_response.json()["csrf_token"]
+
+    logout_response = auth_client.post(
+        "/api/auth/logout",
+        headers={"X-CSRF-Token": csrf_token},
+    )
     assert logout_response.status_code == 200
 
     me_after_logout = auth_client.get("/api/auth/me")
@@ -229,9 +248,12 @@ def test_expired_session_is_rejected(auth_client):
         db.add(session)
         db.commit()
 
+    auth_client.cookies.clear()
     auth_client.cookies.set(
         "rxguard_session",
         "expired-test-token",
+        domain="testserver.local",
+        path="/",
     )
 
     response = auth_client.get("/api/auth/me")
@@ -295,9 +317,54 @@ def test_revoked_session_is_rejected(auth_client):
     )
     assert login_response.status_code == 200
 
-    revoke_response = auth_client.post("/api/auth/logout")
+    csrf_response = auth_client.get("/api/auth/csrf")
+    assert csrf_response.status_code == 200
+    csrf_token = csrf_response.json()["csrf_token"]
+
+    revoke_response = auth_client.post(
+        "/api/auth/logout",
+        headers={"X-CSRF-Token": csrf_token},
+    )
     assert revoke_response.status_code == 200
 
     response = auth_client.get("/api/auth/me")
 
     assert response.status_code == 401
+
+def test_csrf_endpoint_requires_authentication(auth_client):
+    response = auth_client.get("/api/auth/csrf")
+
+    assert response.status_code == 401
+
+
+def test_logout_rejects_missing_csrf_token(auth_client):
+    credentials = {
+        "email": "csrf-missing@example.com",
+        "password": "SecureTestPassword123!",
+    }
+
+    auth_client.post("/api/auth/register", json=credentials)
+    login_response = auth_client.post("/api/auth/login", json=credentials)
+    assert login_response.status_code == 200
+
+    response = auth_client.post("/api/auth/logout")
+
+    assert response.status_code == 403
+
+
+def test_logout_rejects_invalid_csrf_token(auth_client):
+    credentials = {
+        "email": "csrf-invalid@example.com",
+        "password": "SecureTestPassword123!",
+    }
+
+    auth_client.post("/api/auth/register", json=credentials)
+    login_response = auth_client.post("/api/auth/login", json=credentials)
+    assert login_response.status_code == 200
+
+    response = auth_client.post(
+        "/api/auth/logout",
+        headers={"X-CSRF-Token": "invalid-token"},
+    )
+
+    assert response.status_code == 403

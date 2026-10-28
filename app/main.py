@@ -16,7 +16,7 @@ from fastapi import (
     Response,
     UploadFile,
 )
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -25,9 +25,11 @@ from sqlalchemy.orm import Session
 from app.auth import (
     SESSION_DURATION_DAYS,
     create_session,
+    generate_csrf_token,
     get_user_from_session,
     hash_password,
     revoke_session,
+    verify_csrf_token,
     verify_password,
 )
 
@@ -87,6 +89,22 @@ def get_current_user(
 
     return user
 
+def require_csrf_token(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+) -> None:
+    session_token = request.cookies.get("rxguard_session")
+    submitted_token = request.headers.get("X-CSRF-Token")
+
+    if not session_token or not verify_csrf_token(
+        session_token,
+        submitted_token or "",
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid or missing CSRF token.",
+        )
+
 @app.get("/api/auth/me")
 def get_me(
     current_user: User = Depends(get_current_user),
@@ -97,10 +115,49 @@ def get_me(
         "is_active": current_user.is_active,
     }
 
+@app.get("/api/auth/csrf")
+def get_csrf_token(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    session_token = request.cookies.get("rxguard_session")
+
+    if not session_token:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required.",
+        )
+
+    return {
+        "csrf_token": generate_csrf_token(session_token),
+    }
+
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
 
+
+@app.get("/login")
+def login_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "login.html")
+
+
+@app.get("/register")
+def register_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "register.html")
+
+
+@app.get("/checker")
+def checker_page(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Response:
+    token = request.cookies.get("rxguard_session")
+
+    if not token or get_user_from_session(db, token) is None:
+        return RedirectResponse(url="/login", status_code=303)
+
+    return FileResponse(STATIC_DIR / "checker.html")
 
 @app.get("/health")
 def health() -> dict:
@@ -109,6 +166,7 @@ def health() -> dict:
 @app.post("/api/auth/register", status_code=201)
 def register(
     payload: RegisterRequest,
+    response: Response,
     db: Session = Depends(get_db),
 ) -> dict:
     email = str(payload.email).strip().lower()
@@ -137,11 +195,32 @@ def register(
             "An account with this email already exists.",
         )
 
+    token, session = create_session(db, user)
+
+    secure_cookie = os.getenv("RXGUARD_COOKIE_SECURE", "false").lower() == "true"
+
+    response.set_cookie(
+        key="rxguard_session",
+        value=token,
+        max_age=SESSION_DURATION_DAYS * 24 * 60 * 60,
+        httponly=True,
+        secure=secure_cookie,
+        samesite="lax",
+        path="/",
+    )
+
     return {
+        "message": "Registration successful.",
         "id": user.id,
         "email": user.email,
         "is_active": user.is_active,
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "is_active": user.is_active,
+        },
     }
+
 
 @app.post("/api/auth/login")
 def login(
@@ -190,6 +269,8 @@ def logout(
     request: Request,
     response: Response,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_csrf_token),
 ) -> dict:
     token = request.cookies.get("rxguard_session")
 
@@ -272,6 +353,7 @@ END:VCALENDAR""".replace("\n\n", "\n")
 def export_calendar(
     schedule: dict = Body(...),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_csrf_token),
 ) -> Response:
     """Export medication daily schedule as an iCalendar (.ics) download."""
     ics_text = generate_ics(schedule)
@@ -286,6 +368,7 @@ def export_calendar(
 def dispatch_hermes_alert(
     payload: Dict[str, Any] = Body(...),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_csrf_token),
 ) -> dict:
     """Dispatch high-risk medication alert to 24/7 Hermes Caregiver Agent on DigitalOcean."""
     return dispatch_to_hermes(payload)
@@ -295,6 +378,7 @@ def dispatch_hermes_alert(
 def ask_do(
     payload: Dict[str, Any] = Body(...),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_csrf_token),
 ) -> dict:
     """Run medication safety reasoning on DigitalOcean Serverless Inference."""
     question = payload.get("question", "").strip()
@@ -316,6 +400,7 @@ def ask(
     image: Optional[UploadFile] = File(None),
     images: Optional[List[UploadFile]] = File(None),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_csrf_token),
 ) -> dict:
     question = question.strip()
     if not question:

@@ -1,6 +1,8 @@
 from pwdlib import PasswordHash
 import hashlib
 import secrets
+import hmac
+import os
 
 from datetime import datetime, timedelta, timezone
 
@@ -29,7 +31,29 @@ def generate_session_token() -> str:
 def hash_session_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
+def generate_csrf_token(session_token: str) -> str:
+    secret = os.getenv("RXGUARD_CSRF_SECRET")
 
+    if not secret:
+        raise RuntimeError("RXGUARD_CSRF_SECRET is not configured.")
+
+    return hmac.new(
+        secret.encode("utf-8"),
+        session_token.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def verify_csrf_token(session_token: str, csrf_token: str) -> bool:
+    if not csrf_token:
+        return False
+
+    try:
+        expected_token = generate_csrf_token(session_token)
+    except RuntimeError:
+        return False
+
+    return hmac.compare_digest(expected_token, csrf_token)
 
 
 def create_session(db: Session, user: User) -> tuple[str, UserSession]:

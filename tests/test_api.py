@@ -12,8 +12,17 @@ from app.models import User
 
 client = TestClient(main.app)
 
+
+csrf_token = None
+
+
 @pytest.fixture(autouse=True)
-def authenticated_test_user():
+def authenticated_test_user(monkeypatch):
+    global csrf_token
+
+    monkeypatch.setenv("RXGUARD_CSRF_SECRET", "test-only-csrf-secret")
+    client.cookies.clear()
+
     test_user = User(
         id=1,
         email="tester@example.com",
@@ -24,19 +33,39 @@ def authenticated_test_user():
         lambda: test_user
     )
 
+    client.cookies.set(
+        "rxguard_session",
+        "test-session-token",
+        domain="testserver.local",
+        path="/",
+    )
+
+    csrf_response = client.get("/api/auth/csrf")
+    assert csrf_response.status_code == 200
+    csrf_token = csrf_response.json()["csrf_token"]
+
     yield
 
     main.app.dependency_overrides.pop(main.get_current_user, None)
+    client.cookies.clear()
+
 
 def post(question="what is this?", files=None, data=None):
     payload = {"question": question}
     if data:
         payload.update(data)
-    return client.post("/api/ask", data=payload, files=files)
+
+    return client.post(
+        "/api/ask",
+        data=payload,
+        files=files,
+        headers={"X-CSRF-Token": csrf_token},
+    )
 
 
 def test_health():
     assert client.get("/health").json() == {"status": "ok"}
+
 
 
 def test_index_page_is_served():
@@ -44,8 +73,8 @@ def test_index_page_is_served():
 
     assert res.status_code == 200
     assert "RxGuard" in res.text
-    assert "your medicines" in res.text
-    assert "before you take" in res.text
+    assert "Make more informed decisions about your medication." in res.text
+    assert "potential interactions" in res.text
 
 
 def test_blank_question_is_rejected():
@@ -122,7 +151,11 @@ def test_calendar_export_endpoint():
         "evening": ["Metformin 500mg"],
         "bedtime": ["Atorvastatin 20mg"],
     }
-    res = client.post("/api/calendar/export", json=schedule)
+    res = client.post(
+        "/api/calendar/export",
+        json=schedule,
+        headers={"X-CSRF-Token": csrf_token},
+    )
     assert res.status_code == 200
     assert "text/calendar" in res.headers["content-type"]
     text = res.text
@@ -167,7 +200,11 @@ def test_hermes_dispatch_endpoint():
         "safety_score": "DANGER",
         "medications": ["Percocet", "Tylenol"],
     }
-    res = client.post("/api/hermes/dispatch", json=alert_payload)
+    res = client.post(
+        "/api/hermes/dispatch",
+        json=alert_payload,
+        headers={"X-CSRF-Token": csrf_token},
+    )
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "dispatched"
