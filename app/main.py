@@ -139,12 +139,12 @@ def index() -> FileResponse:
 
 @app.get("/login")
 def login_page() -> FileResponse:
-    return FileResponse(STATIC_DIR / "login.html")
+    return FileResponse(STATIC_DIR / "auth.html")
 
 
 @app.get("/register")
 def register_page() -> FileResponse:
-    return FileResponse(STATIC_DIR / "register.html")
+    return FileResponse(STATIC_DIR / "auth.html")
 
 
 @app.get("/checker")

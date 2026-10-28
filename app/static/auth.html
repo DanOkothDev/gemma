@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FFFCF4">
+<meta name="description" content="Log in or create your RxGuard account.">
+<title>Login / Sign Up | RxGuard</title>
+<style>
+:root{
+  --bg:#FFFCF4; --bg-glow:#FFB7A5; --panel:#FFFCF4; --text:#1A0B2E; --muted:rgba(26,11,46,.68);
+  --field:#F0F2F5; --border:#FFB7A5; --brand:#E30B5D; --brand-2:#7A35FF; --on-brand:#FFFCF4;
+  --shadow:rgba(122,53,255,.25); --err-bg:#FFB7A5; --ok-bg:#B7FF72;
+}
+:root[data-theme="dark"]{
+  --bg:#1A0B2E; --bg-glow:#7A35FF; --panel:#0B132B; --text:#EAF8FC; --muted:rgba(234,248,252,.75);
+  --field:#1A0B2E; --border:rgba(255,183,165,.35); --shadow:rgba(0,0,0,.55); --err-bg:#E30B5D; --ok-bg:#39FF88;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;align-items:center;
+  font-family:Montserrat,Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);line-height:1.5;
+  background:radial-gradient(900px 500px at 15% 0%,color-mix(in srgb,var(--bg-glow) 45%,transparent),transparent 60%),
+             radial-gradient(800px 500px at 100% 100%,color-mix(in srgb,#7A35FF 28%,transparent),transparent 60%),var(--bg);
+  transition:background .4s,color .4s;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:3px solid #7A35FF;outline-offset:3px;border-radius:8px}
+.topbar{width:min(1100px,calc(100% - 32px));display:flex;align-items:center;justify-content:space-between;padding:18px 0}
+.brand{display:inline-flex;align-items:center;gap:10px;font-size:1.3rem;font-weight:800;letter-spacing:-.6px}
+.brand-mark{display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#E30B5D,#7A35FF);color:#FFFCF4;font-size:1.4rem}
+.theme-toggle{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:8px 14px;border:1px solid var(--border);border-radius:999px;background:var(--panel);color:var(--text);font:600 .85rem inherit;font-family:inherit;cursor:pointer;transition:transform .2s}
+.theme-toggle:hover{transform:scale(1.05)}
+main{flex:1;width:100%;display:grid;place-items:center;padding:12px 16px 24px}
+
+.card{position:relative;display:grid;grid-template-columns:1fr 1fr;width:min(900px,100%);min-height:560px;overflow:hidden;border-radius:22px;background:var(--panel);box-shadow:0 30px 80px var(--shadow);animation:rise .8s cubic-bezier(.2,.8,.2,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(28px) scale(.98)}to{opacity:1;transform:none}}
+.welcome{position:absolute;inset:0 auto 0 0;width:50%;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 30px;color:var(--on-brand);background:linear-gradient(160deg,#E30B5D 0%,#B13BD8 55%,#7A35FF 100%);transition:transform .7s cubic-bezier(.77,0,.18,1);overflow:hidden}
+.welcome::before,.welcome::after{content:"";position:absolute;border-radius:50%;background:rgba(255,252,244,.14);animation:drift 9s ease-in-out infinite}
+.welcome::before{width:220px;height:220px;top:-70px;left:-60px}
+.welcome::after{width:160px;height:160px;bottom:-50px;right:-40px;animation-delay:-4s}
+@keyframes drift{50%{transform:translate(18px,14px) scale(1.08)}}
+.welcome>*{position:relative;z-index:1}
+.welcome h2{margin:0 0 10px;font-size:clamp(1.8rem,3.6vw,2.4rem);letter-spacing:1px;font-weight:800}
+.welcome p{margin:0 0 26px;max-width:260px;font-size:.92rem}
+.seg{display:inline-flex;padding:5px;border-radius:999px;background:#FFFCF4;box-shadow:0 10px 24px rgba(26,11,46,.25)}
+.seg button{min-height:42px;padding:8px 22px;border:0;border-radius:999px;background:transparent;color:#1A0B2E;font:800 .85rem inherit;font-family:inherit;cursor:pointer;transition:background .3s,color .3s}
+.seg button.active{background:linear-gradient(135deg,#E30B5D,#7A35FF);color:#FFFCF4}
+
+.form-panel{grid-column:2;display:flex;flex-direction:column;justify-content:center;padding:40px 44px;transition:transform .7s cubic-bezier(.77,0,.18,1)}
+.card.signup-mode .welcome{transform:translateX(100%)}
+.card.signup-mode .form-panel{transform:translateX(-100%)}
+.avatar{display:grid;place-items:center;width:58px;height:58px;margin:0 auto 8px;border-radius:50%;background:linear-gradient(135deg,#E30B5D,#FFB7A5);color:#FFFCF4;box-shadow:0 10px 22px var(--shadow)}
+.panel-title{margin:0 0 20px;text-align:center;font-size:1rem;font-weight:800;letter-spacing:1.5px;color:var(--text)}
+form{display:none;animation:fade .5s both}
+form.show{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.field{position:relative;margin-bottom:14px}
+.field input{width:100%;min-height:48px;padding:12px 48px 12px 16px;border:1px solid transparent;border-radius:12px;background:var(--field);color:var(--text);font:inherit;font-size:.95rem;outline:none;transition:border-color .2s,box-shadow .2s}
+.field input::placeholder{color:var(--muted)}
+.field input:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(227,11,93,.18)}
+.field .ico{position:absolute;top:50%;right:8px;transform:translateY(-50%);display:grid;place-items:center;width:36px;height:36px;border:0;background:transparent;color:var(--muted);pointer-events:none}
+.field button.ico{pointer-events:auto;cursor:pointer;border-radius:8px}
+.field button.ico:hover{color:var(--brand)}
+.slash{display:none}.ico.on .slash{display:block}
+.hint{margin:-4px 0 14px;font-size:.78rem;color:var(--muted)}
+.submit{width:100%;min-height:50px;display:flex;align-items:center;justify-content:center;gap:10px;margin-top:6px;border:0;border-radius:12px;background:linear-gradient(135deg,#E30B5D,#7A35FF);color:#FFFCF4;font:800 .9rem inherit;font-family:inherit;letter-spacing:1px;cursor:pointer;box-shadow:0 12px 26px var(--shadow);transition:transform .2s,opacity .2s}
+.submit:hover:not(:disabled){transform:translateY(-2px)}
+.submit:disabled{opacity:.65;cursor:not-allowed}
+.spinner{width:17px;height:17px;border:2px solid rgba(255,252,244,.45);border-top-color:#FFFCF4;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.message{display:none;margin:0 0 14px;padding:11px 14px;border-radius:10px;font-size:.85rem;overflow-wrap:anywhere;color:#1A0B2E}
+.message.error{display:block;background:var(--err-bg);color:#1A0B2E}
+:root[data-theme="dark"] .message.error{color:#FFFCF4}
+.message.success{display:block;background:var(--ok-bg)}
+.switch-note{margin:18px 0 0;text-align:center;font-size:.85rem;color:var(--muted)}
+.switch-note button{border:0;background:none;padding:0;color:var(--brand);font:800 inherit;font-family:inherit;cursor:pointer}
+.switch-note button:hover{text-decoration:underline}
+.secure{margin:18px 0 0;padding-top:14px;border-top:1px solid var(--border);font-size:.76rem;color:var(--muted);text-align:center}
+footer{padding:6px 20px 22px;text-align:center;font-size:.8rem;color:var(--muted);max-width:560px}
+
+@media(max-width:720px){
+  .card{display:block;min-height:0;max-width:480px}
+  .welcome{position:static;width:auto;padding:28px 22px;transform:none!important}
+  .welcome p{margin-bottom:18px}
+  .form-panel{padding:28px 22px 30px;transform:none!important}
+}
+@media(max-width:380px){.seg button{padding:8px 16px}.form-panel{padding:24px 16px 26px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="brand" href="/" aria-label="RxGuard home"><span class="brand-mark" aria-hidden="true">+</span><span>RxGuard</span></a>
+  <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch to dark mode"><span id="themeIcon" aria-hidden="true">☾</span><span id="themeLabel">Dark</span></button>
+</div>
+
+<main>
+<div class="card" id="card">
+  <section class="welcome">
+    <h2>WELCOME!</h2>
+    <p><strong>Login</strong> or <strong>Sign Up</strong> to securely access your RxGuard medication workspace.</p>
+    <div class="seg" role="group" aria-label="Choose login or sign up">
+      <button type="button" id="btnLogin" class="active" aria-pressed="true">Login</button>
+      <button type="button" id="btnSignup" aria-pressed="false">Sign Up</button>
+    </div>
+  </section>
+
+  <section class="form-panel">
+    <div class="avatar" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4.2"/><path d="M3.5 21c.8-4.6 4.4-6.6 8.5-6.6s7.7 2 8.5 6.6z"/></svg></div>
+    <h1 class="panel-title" id="panelTitle">LOGIN</h1>
+    <div id="message" class="message" role="alert" aria-live="polite"></div>
+
+    <form id="login-form" class="show" novalidate>
+      <div class="field"><input type="email" id="login-email" placeholder="Email" autocomplete="email" maxlength="254" required aria-label="Email address">
+        <span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span></div>
+      <div class="field"><input type="password" id="login-password" placeholder="Password" autocomplete="current-password" minlength="12" maxlength="128" required aria-label="Password">
+        <button type="button" class="ico eye" data-target="login-password" aria-label="Show password" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="slash" d="M4 4l16 16"/></svg></button></div>
+      <button class="submit" type="submit"><span>LOGIN</span></button>
+      <p class="switch-note">New here? <button type="button" data-mode="signup">Create an account</button></p>
+    </form>
+
+    <form id="register-form" novalidate>
+      <div class="field"><input type="email" id="reg-email" placeholder="Email" autocomplete="email" maxlength="254" required aria-label="Email address">
+        <span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span></div>
+      <div class="field"><input type="password" id="reg-password" placeholder="Create a password" autocomplete="new-password" minlength="12" maxlength="128" required aria-label="Password">
+        <button type="button" class="ico eye" data-target="reg-password" aria-label="Show password" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="slash" d="M4 4l16 16"/></svg></button></div>
+      <p class="hint">Use between 12 and 128 characters.</p>
+      <div class="field"><input type="password" id="reg-confirm" placeholder="Confirm password" autocomplete="new-password" minlength="12" maxlength="128" required aria-label="Confirm password">
+        <button type="button" class="ico eye" data-target="reg-confirm" aria-label="Show password confirmation" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="slash" d="M4 4l16 16"/></svg></button></div>
+      <button class="submit" type="submit"><span>SIGN UP</span></button>
+      <p class="switch-note">Already have an account? <button type="button" data-mode="login">Login</button></p>
+    </form>
+
+    <p class="secure">🔒 Your session is managed securely by RxGuard. Never share your password.</p>
+  </section>
+</div>
+</main>
+<footer>RxGuard provides informational support and does not replace professional medical advice.</footer>
+
+<script>
+(function(){
+  var root=document.documentElement, card=document.getElementById("card");
+  var btnLogin=document.getElementById("btnLogin"), btnSignup=document.getElementById("btnSignup");
+  var panelTitle=document.getElementById("panelTitle"), msg=document.getElementById("message");
+  var loginForm=document.getElementById("login-form"), regForm=document.getElementById("register-form");
+
+  /* Theme (default light) */
+  var toggle=document.getElementById("themeToggle"), icon=document.getElementById("themeIcon"), label=document.getElementById("themeLabel");
+  function applyTheme(t){var d=t==="dark";root.setAttribute("data-theme",t);icon.textContent=d?"☀":"☾";label.textContent=d?"Light":"Dark";
+    toggle.setAttribute("aria-label",d?"Switch to light mode":"Switch to dark mode");
+    document.querySelector('meta[name="theme-color"]').setAttribute("content",d?"#1A0B2E":"#FFFCF4");}
+  var saved=null;try{saved=localStorage.getItem("rxguard-theme")}catch(e){}
+  applyTheme(saved==="dark"?"dark":"light");
+  toggle.addEventListener("click",function(){var n=root.getAttribute("data-theme")==="dark"?"light":"dark";applyTheme(n);try{localStorage.setItem("rxguard-theme",n)}catch(e){}});
+
+  /* Messages */
+  function showMessage(text,type){msg.textContent=text;msg.className="message "+(type||"error");}
+  function clearMessage(){msg.textContent="";msg.className="message";}
+
+  /* Mode switch */
+  function setMode(mode){
+    var signup=mode==="signup";
+    card.classList.toggle("signup-mode",signup);
+    btnSignup.classList.toggle("active",signup);btnLogin.classList.toggle("active",!signup);
+    btnSignup.setAttribute("aria-pressed",String(signup));btnLogin.setAttribute("aria-pressed",String(!signup));
+    panelTitle.textContent=signup?"SIGN UP":"LOGIN";
+    loginForm.classList.toggle("show",!signup);regForm.classList.toggle("show",signup);
+    document.title=(signup?"Sign Up":"Login")+" | RxGuard";
+    clearMessage();
+  }
+  btnLogin.addEventListener("click",function(){setMode("login")});
+  btnSignup.addEventListener("click",function(){setMode("signup")});
+  document.querySelectorAll("[data-mode]").forEach(function(b){b.addEventListener("click",function(){setMode(b.dataset.mode)})});
+  var startSignup=/register|signup/i.test(location.pathname+location.hash);
+  setMode(startSignup?"signup":"login");
+
+  /* Show / hide password */
+  document.querySelectorAll(".eye").forEach(function(b){
+    b.addEventListener("click",function(){
+      var input=document.getElementById(b.dataset.target), show=input.type==="password";
+      input.type=show?"text":"password";b.classList.toggle("on",show);b.setAttribute("aria-pressed",String(show));
+      b.setAttribute("aria-label",(show?"Hide":"Show")+" password");
+    });
+  });
+
+  function setLoading(btn,loading,text,loadingText){
+    btn.disabled=loading;btn.replaceChildren();
+    if(loading){var s=document.createElement("span");s.className="spinner";s.setAttribute("aria-hidden","true");
+      var l=document.createElement("span");l.textContent=loadingText;btn.append(s,l);}
+    else{var t=document.createElement("span");t.textContent=text;btn.append(t);}
+  }
+  function errorFrom(data,fallback){
+    if(data&&typeof data.detail==="string")return data.detail;
+    if(data&&Array.isArray(data.detail))return data.detail.map(function(e){return e.msg||"Invalid input."}).join(" ");
+    if(data&&typeof data.message==="string")return data.message;
+    return fallback;
+  }
+
+  /* Login */
+  loginForm.addEventListener("submit",async function(e){
+    e.preventDefault();clearMessage();
+    if(!loginForm.reportValidity())return;
+    var btn=loginForm.querySelector(".submit");
+    var email=document.getElementById("login-email").value.trim().toLowerCase();
+    var password=document.getElementById("login-password").value;
+    setLoading(btn,true,"LOGIN","SIGNING IN...");
+    try{
+      var res=await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify({email:email,password:password})});
+      var data=await res.json().catch(function(){return{}});
+      if(!res.ok){showMessage(errorFrom(data,"Sign-in failed. Please try again."));return;}
+      if(!data.user||!data.user.id){showMessage("The server response was incomplete. Please try signing in again.");return;}
+      showMessage("Sign-in successful. Opening your workspace...","success");
+      window.location.assign("/checker");
+    }catch(err){showMessage("Unable to connect to RxGuard. Check your connection and try again.");}
+    finally{setLoading(btn,false,"LOGIN","");}
+  });
+
+  /* Register */
+  regForm.addEventListener("submit",async function(e){
+    e.preventDefault();clearMessage();
+    var email=document.getElementById("reg-email").value.trim();
+    var pw=document.getElementById("reg-password").value, cf=document.getElementById("reg-confirm").value;
+    if(!email||!document.getElementById("reg-email").checkValidity()){showMessage("Please enter a valid email address.");return;}
+    if(pw.length<12||pw.length>128){showMessage("Your password must contain between 12 and 128 characters.");return;}
+    if(pw!==cf){showMessage("Your passwords do not match.");document.getElementById("reg-confirm").focus();return;}
+    var btn=regForm.querySelector(".submit");
+    setLoading(btn,true,"SIGN UP","CREATING ACCOUNT...");
+    try{
+      var res=await fetch("/api/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify({email:email,password:pw})});
+      var data=await res.json().catch(function(){return{}});
+      if(!res.ok){
+        showMessage(res.status===409?"An account with this email already exists. Try logging in instead.":errorFrom(data,"We couldn't create your account."));
+        return;
+      }
+      
+        window.location.replace("/checker");
+        return;
+        
+    }catch(err){showMessage("Unable to reach RxGuard. Check your connection and try again.");}
+    finally{setLoading(btn,false,"SIGN UP","");}
+  });
+
+  /* Skip the form if already signed in */
+  if(!startSignup){
+    fetch("/api/auth/me",{credentials:"same-origin",headers:{"Accept":"application/json"}})
+      .then(function(r){if(r.ok)window.location.replace("/checker")}).catch(function(){});
+  }
+})();
+</script>
+</body>
+</html>
