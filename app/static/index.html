@@ -3,19 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#EAF8FC">
+<meta name="theme-color" content="#E6F5F8">
 <meta name="description" content="RxGuard helps you review medication information, potential interactions, food cautions, and daily schedules.">
 <title>RxGuard | Understand Your Medication</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#EAF8FC; --surface:#FFFCF4; --text:#0B132B; --muted:rgba(11,19,43,.74);
+  --bg:#E6F5F8; --surface:#FFFCF4; --text:#0B132B; --muted:rgba(11,19,43,.74);
   --border:#BFE0FF; --accent:#BFE0FF; --primary:#2F6BFF; --primary-text:#FFFCF4;
-  --band:#BFE0FF; --glass:rgba(255,252,244,.82); --shadow:rgba(47,107,255,.18);
+  --band:#BFE0FF; --glass:rgba(255,252,244,.88); --shadow:rgba(47,107,255,.18);
+  --grey:#666666; --body:#111111; --corner:#BFE6F2; --corner-op:1;
+  --pill:#6FD3E3; --pill-ring:#3BB8D4;
 }
 :root[data-theme="dark"]{
   --bg:#0B132B; --surface:#1A0B2E; --text:#EAF8FC; --muted:rgba(234,248,252,.78);
   --border:rgba(91,231,245,.28); --accent:#2F6BFF; --band:#1A0B2E;
-  --glass:rgba(26,11,46,.85); --shadow:rgba(0,0,0,.45);
+  --glass:rgba(26,11,46,.88); --shadow:rgba(0,0,0,.45);
+  --grey:#EAF8FC; --body:#EAF8FC; --corner:#2F6BFF; --corner-op:.25;
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
@@ -27,62 +33,45 @@ a{color:inherit;text-decoration:none}
 /* Header */
 header{position:fixed;top:0;left:0;right:0;z-index:50;padding-top:env(safe-area-inset-top,0px);transition:background .3s,box-shadow .3s}
 header.scrolled{background:var(--glass);backdrop-filter:blur(14px);box-shadow:0 1px 0 var(--border)}
-.navbar{min-height:78px;display:flex;align-items:center;justify-content:space-between;gap:20px;width:min(1240px,calc(100% - 40px));margin:0 auto}
-.brand{display:inline-flex;align-items:center;gap:11px;font-size:1.55rem;font-weight:800;letter-spacing:-.8px}
+.navbar{display:flex;align-items:center;justify-content:space-between;gap:20px;width:100%;height:max(78px,12.8vw);padding:0 5.1vw 0 5.2vw;transition:height .3s}
+header.scrolled .navbar{height:78px}
+.brand{display:inline-flex;align-items:center;gap:11px;font-size:1.55rem;font-weight:800;letter-spacing:-.8px;color:var(--text)}
 .brand-mark{display:grid;width:42px;height:42px;place-items:center;border-radius:13px;background:linear-gradient(135deg,#5BE7F5,#2F6BFF);color:#FFFCF4;font-size:1.5rem;box-shadow:0 8px 18px var(--shadow)}
-.nav-right{display:flex;align-items:center;gap:26px}
-.nav-links{display:flex;gap:28px;font-size:.95rem;font-weight:600}
+header .brand{font-size:max(26px,3.7vw);font-weight:600;letter-spacing:-.5px;color:var(--grey);transition:font-size .3s,color .3s}
+header.scrolled .brand{font-size:1.55rem;font-weight:700;color:var(--text)}
+.nav-right{display:flex;align-items:center;gap:2.6vw;transform:translateY(-1.3vw);transition:transform .3s}
+header.scrolled .nav-right{transform:none}
+.nav-links{display:flex;gap:2.4vw;font-size:max(14px,1.5vw);font-weight:600}
 .nav-links a{color:#FFFCF4;position:relative}
 .nav-links a::after{content:"";position:absolute;left:0;bottom:-4px;height:2px;width:0;background:#B7FF72;transition:width .25s}
 .nav-links a:hover::after{width:100%}
 header.scrolled .nav-links a{color:var(--text)}
-.login{display:inline-flex;align-items:center;gap:10px}
-.login-pill{padding:7px 18px;border-radius:10px;background:#FFFCF4;color:#2F6BFF;font-weight:800;box-shadow:0 8px 20px rgba(11,19,43,.25);transition:transform .2s}
+.login{display:inline-flex;align-items:center;gap:1.2vw}
+.login-pill{padding:.25vw 1.1vw;border-radius:.6vw;background:#FFFFFF;color:#1B5F9E;font-size:max(15px,1.75vw);font-weight:700;box-shadow:0 .5vw 1.2vw rgba(11,19,43,.22);transition:transform .2s}
 .login-pill:hover{transform:translateY(-2px)}
-header.scrolled .login-pill{background:var(--primary);color:var(--primary-text)}
-.user-icon{width:36px;height:36px;color:#FFFCF4}
+header.scrolled .login-pill{background:var(--primary);color:var(--primary-text);font-size:1rem;padding:6px 16px;border-radius:10px}
+.user-icon{width:max(30px,2.5vw);height:max(30px,2.5vw);color:#FFFFFF}
 header.scrolled .user-icon{color:var(--primary)}
-.theme-toggle{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:8px 14px;border:1px solid rgba(255,252,244,.6);border-radius:999px;background:rgba(255,252,244,.15);color:#FFFCF4;font:600 .85rem inherit;font-family:inherit;cursor:pointer;transition:transform .2s,background .2s}
+.theme-toggle{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:6px 12px;border:1px solid rgba(255,252,244,.6);border-radius:999px;background:rgba(255,252,244,.15);color:#FFFCF4;font:600 .8rem inherit;font-family:inherit;cursor:pointer;transition:transform .2s,background .2s}
 .theme-toggle:hover{transform:scale(1.05)}
 header.scrolled .theme-toggle{border-color:var(--border);background:var(--surface);color:var(--text)}
 .menu-btn{display:none;width:44px;height:44px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text);cursor:pointer;font-size:1.3rem}
 
-/* Hero */
-.hero{position:relative;min-height:100vh;min-height:100svh;display:flex;align-items:center;padding:120px 0 90px;overflow:hidden;background:var(--bg)}
-.hero::before{content:"";position:absolute;top:0;left:0;width:240px;height:220px;border-bottom-right-radius:60px;background:linear-gradient(135deg,#BFE0FF,transparent);opacity:.7}
-.shape{position:absolute;top:0;right:0;height:100%;width:64%;z-index:0}
-.shape svg{width:100%;height:100%;display:block}
-.float{animation:float 6s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
-.float.d2{animation-delay:-2s}.float.d3{animation-delay:-4s}
-@keyframes float{0%,100%{transform:translateY(0) rotate(var(--r,0deg))}50%{transform:translateY(-14px) rotate(calc(var(--r,0deg) + 6deg))}}
-.dash{stroke-dasharray:6 8;animation:dash 24s linear infinite}
-@keyframes dash{to{stroke-dashoffset:-280}}
-.hero-grid{position:relative;z-index:2;display:grid;grid-template-columns:1.05fr .95fr;gap:50px;align-items:center}
-.hero-left{position:relative;padding-bottom:110px}
-.hello{margin:0;font-size:1.15rem;font-weight:700;color:var(--muted)}
-h1{margin:6px 0 18px;font-size:clamp(2.4rem,5.2vw,4.1rem);line-height:1.08;letter-spacing:-2px;font-weight:800;animation:rise .9s cubic-bezier(.2,.8,.2,1) both}
-@keyframes rise{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
-.hero-copy{max-width:470px;margin:0;color:var(--text);font-size:1rem}
-.disclaimer{max-width:470px;margin:16px 0 0;font-size:.8rem;color:var(--muted)}
-.pill-cta{position:absolute;left:0;bottom:30px;display:inline-flex;align-items:center;width:min(300px,100%);padding:4px;border-radius:999px;background:#5BE7F5;color:var(--text);font-size:1.35rem;font-weight:600;box-shadow:0 12px 28px var(--shadow);transition:transform .25s}
+/* Hero, laid out on the same 1403 x 792 frame as the reference design */
+.hero{position:relative;height:56.4vw;min-height:560px;overflow:hidden;background:var(--bg)}
+.art{position:absolute;inset:0;width:100%;height:100%;z-index:0;display:block}
+.hero-left{position:absolute;z-index:2;left:14.8%;top:13.5vw;width:32vw}
+.hello{margin:0 0 .5vw;font-size:max(15px,1.85vw);font-weight:600;color:var(--grey);line-height:1.2}
+h1{margin:0 0 1.1vw;font-size:max(28px,3vw);line-height:1.08;letter-spacing:-.06em;font-weight:800;color:var(--grey);animation:rise .9s cubic-bezier(.2,.8,.2,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+.hero-copy{margin:0;color:var(--body);font-size:max(13px,1.2vw);line-height:1.5}
+.disclaimer{margin:.9vw 0 0;font-size:max(11px,.85vw);line-height:1.45;color:var(--muted)}
+.pill-cta{position:absolute;z-index:2;left:30.3vw;top:42.55vw;display:flex;align-items:center;width:21.4vw;height:3.85vw;padding:.28vw;border-radius:999px;background:var(--pill);box-shadow:0 .5vw 1.2vw var(--shadow);transition:transform .25s}
 .pill-cta:hover{transform:translateY(-3px)}
-.pill-arrow{display:grid;place-items:center;width:52px;height:52px;border:2px solid #2F6BFF;border-radius:50%;background:#EAF8FC;color:#2F6BFF;transition:transform .3s}
+.pill-arrow{display:grid;place-items:center;flex:none;width:3.3vw;height:3.3vw;border:2px solid var(--pill-ring);border-radius:50%;background:#E6F5F8;color:var(--pill-ring);transition:transform .3s}
+.pill-arrow svg{width:55%;height:auto}
 .pill-cta:hover .pill-arrow{transform:translateX(6px)}
-.pill-cta span.label{flex:1;text-align:center}
-.decor{position:absolute;left:-30px;bottom:-30px;width:440px;height:170px;pointer-events:none;z-index:-1}
-.link-more{margin-left:18px;font-weight:700;color:var(--primary);align-self:center}
-
-.preview-card{padding:24px;border:1px solid var(--border);border-radius:22px;background:var(--glass);backdrop-filter:blur(10px);box-shadow:0 24px 60px rgba(11,19,43,.28);animation:rise 1s .2s cubic-bezier(.2,.8,.2,1) both}
-.preview-label{margin:0 0 14px;font-size:.82rem;font-weight:700;color:var(--muted)}
-.preview-heading{display:flex;align-items:center;gap:14px;margin-bottom:12px}
-.preview-icon{display:grid;width:48px;height:48px;place-items:center;border-radius:15px;background:linear-gradient(135deg,#5BE7F5,#2F6BFF);color:#FFFCF4;font-size:1.4rem}
-.preview-heading h2{margin:0;font-size:1.05rem}
-.preview-heading p{margin:2px 0 0;color:var(--muted);font-size:.83rem}
-.preview-row{display:flex;gap:12px;padding:14px 0;border-top:1px solid var(--border);transition:transform .25s}
-.preview-row:hover{transform:translateX(6px)}
-.preview-check{display:grid;flex-shrink:0;width:26px;height:26px;place-items:center;border-radius:50%;background:#B7FF72;color:#0B132B;font-size:.8rem;font-weight:800}
-.preview-row strong{display:block;font-size:.93rem}
-.preview-row p{margin:2px 0 0;color:var(--muted);font-size:.83rem}
+.pill-cta .label{flex:1;text-align:center;font-size:max(16px,2vw);font-weight:500;color:#666666;padding-right:1vw}
 
 /* Sections */
 .section{padding:84px 0}
@@ -120,30 +109,33 @@ footer .brand{font-size:1.2rem}footer .brand-mark{width:34px;height:34px;font-si
 @media(max-width:900px){
   .menu-btn{display:inline-grid;place-items:center}
   header{background:var(--glass);backdrop-filter:blur(14px);box-shadow:0 1px 0 var(--border)}
-  .brand{color:var(--text)}
+  .navbar{height:68px;padding:0 20px}
+  header .brand,header.scrolled .brand{font-size:1.4rem;font-weight:700;color:var(--text)}
   .nav-right{position:absolute;top:100%;left:0;right:0;flex-direction:column;align-items:stretch;gap:14px;padding:18px 20px 22px;background:var(--surface);border-bottom:1px solid var(--border);transform:translateY(-12px);opacity:0;visibility:hidden;transition:.25s}
-  .nav-right.open{transform:none;opacity:1;visibility:visible}
-  .nav-links{flex-direction:column;gap:14px}
+  header.scrolled .nav-right{transform:translateY(-12px)}
+  .nav-right.open,header.scrolled .nav-right.open{transform:none;opacity:1;visibility:visible}
+  .nav-links{flex-direction:column;gap:14px;font-size:1rem}
   .nav-links a,header .nav-links a{color:var(--text)}
-  .login-pill{background:var(--primary)!important;color:var(--primary-text)!important}
-  .user-icon{color:var(--primary)!important}
-  .login{justify-content:space-between}
+  .login{justify-content:space-between;gap:12px}
+  .login-pill,header.scrolled .login-pill{background:var(--primary);color:var(--primary-text);font-size:1rem;padding:8px 20px;border-radius:10px;box-shadow:none}
+  .user-icon{width:34px;height:34px;color:var(--primary)!important}
   .theme-toggle{justify-content:center;border-color:var(--border);background:var(--bg);color:var(--text)}
-  .hero{align-items:flex-start;padding:104px 0 60px}
-  .shape{top:auto;bottom:0;width:100%;height:62%}
-  .hero-grid{grid-template-columns:1fr;gap:34px}
-  .hero-left{padding-bottom:84px}
-  .preview-card{max-width:560px;margin:0 auto;width:100%}
+  .hero{height:auto;min-height:100svh;padding:104px 20px 70px;display:flex;flex-direction:column;justify-content:flex-start}
+  .art{opacity:.35}
+  .hero-left{position:relative;left:auto;top:auto;width:100%;max-width:560px}
+  .hello{font-size:1rem}
+  h1{font-size:clamp(2.1rem,8vw,3rem);letter-spacing:-1.5px}
+  .hero-copy{font-size:1rem}
+  .disclaimer{font-size:.8rem;margin-top:14px}
+  .pill-cta{position:relative;left:auto;top:auto;width:min(300px,100%);height:56px;padding:4px;margin-top:26px}
+  .pill-arrow{width:48px;height:48px}
+  .pill-cta .label{font-size:1.2rem}
 }
 @media(max-width:700px){.features{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){
   .container{width:min(100% - 28px,1120px)}
-  .navbar{width:calc(100% - 28px);min-height:68px}
-  .brand{font-size:1.3rem}
   .features,.steps{grid-template-columns:1fr}
   .section{padding:60px 0}
-  .pill-cta{font-size:1.2rem}
-  .decor{width:300px;opacity:.7}
   .cta{padding:50px 20px}
   .footer-inner{flex-direction:column;align-items:flex-start}
 }
@@ -157,7 +149,7 @@ footer .brand{font-size:1.2rem}footer .brand-mark{width:34px;height:34px;font-si
 <body>
 <header id="top">
   <nav class="navbar" aria-label="Main navigation">
-    <a class="brand" href="/" aria-label="RxGuard home"><span class="brand-mark" aria-hidden="true">+</span><span>RxGuard</span></a>
+    <a class="brand" href="/" aria-label="RxGuard home"><span>RxGuard</span></a>
     <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false" aria-controls="navRight">☰</button>
     <div class="nav-right" id="navRight">
       <div class="nav-links">
@@ -177,49 +169,55 @@ footer .brand{font-size:1.2rem}footer .brand-mark{width:34px;height:34px;font-si
 
 <main>
 <section class="hero">
-  <div class="shape" aria-hidden="true">
-    <svg viewBox="0 0 1000 800" preserveAspectRatio="xMaxYMid slice">
-      <defs>
-        <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#BFE0FF"/><stop offset=".38" stop-color="#5BE7F5"/><stop offset=".72" stop-color="#2F6BFF"/><stop offset="1" stop-color="#0B132B"/></linearGradient>
-        <linearGradient id="g2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2F6BFF"/><stop offset="1" stop-color="#0B132B"/></linearGradient>
-      </defs>
-      <path d="M230 0H1000V800H410C320 800 290 720 345 668C410 606 400 540 330 520C250 497 225 470 190 410C150 345 120 280 90 220Z" fill="url(#g1)"/>
-      <path d="M230 0 90 220" stroke="#FFFCF4" stroke-opacity=".6" fill="none"/>
-      <circle cx="760" cy="300" r="175" fill="url(#g2)" opacity=".85"/>
-      <circle class="dash" cx="640" cy="330" r="150" fill="none" stroke="#EAF8FC" stroke-opacity=".7" stroke-width="2"/>
-      <rect class="float" style="--r:-12deg" x="800" y="500" width="70" height="70" rx="14" fill="#BFE0FF" opacity=".55"/>
-      <rect class="float d2" style="--r:14deg" x="900" y="590" width="50" height="50" rx="12" fill="#BFE0FF" opacity=".55"/>
-      <rect class="float d3" style="--r:8deg" x="780" y="670" width="48" height="48" rx="12" fill="#BFE0FF" opacity=".5"/>
-    </svg>
-  </div>
+  <svg class="art" viewBox="0 0 1403 792" preserveAspectRatio="xMaxYMid slice" aria-hidden="true">
+    <defs>
+      <linearGradient id="gL" gradientUnits="userSpaceOnUse" x1="450" y1="0" x2="900" y2="450"><stop offset="0" stop-color="#8AD3E4"/><stop offset="1" stop-color="#3FC3DC"/></linearGradient>
+      <linearGradient id="gD" gradientUnits="userSpaceOnUse" x1="1000" y1="0" x2="1250" y2="792"><stop offset="0" stop-color="#0B5596"/><stop offset=".32" stop-color="#1B86B8"/><stop offset=".58" stop-color="#3CC2DB"/><stop offset="1" stop-color="#86D3E3"/></linearGradient>
+      <linearGradient id="gS" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#4FD3E6"/><stop offset="1" stop-color="#1B6FB0"/></linearGradient>
+      <linearGradient id="gC" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--corner);stop-opacity:var(--corner-op)"/><stop offset="1" style="stop-color:var(--corner);stop-opacity:0"/></linearGradient>
+      <filter id="sh" x="-30%" y="-30%" width="180%" height="180%"><feDropShadow dx="5" dy="7" stdDeviation="5" flood-color="#0B3A66" flood-opacity=".28"/></filter>
+    </defs>
 
-  <div class="hero-grid container">
-    <div class="hero-left">
-      <p class="hello">Hello, and welcome to RxGuard</p>
-      <h1>Make more informed decisions about your medication.</h1>
-      <p class="hero-copy">We're glad you're here. RxGuard helps you review medication information, understand potential interactions [when two medicines affect each other], explore food cautions, and organise your daily schedule in one friendly place.</p>
-      <p class="disclaimer">RxGuard provides informational support, not a diagnosis or a replacement for advice from a qualified healthcare professional.</p>
-      <a class="pill-cta" href="/login"><span class="pill-arrow" aria-hidden="true"><svg width="24" height="14" viewBox="0 0 24 14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 7h21M16 1l6 6-6 6"/></svg></span><span class="label">Get Started</span></a>
-      <svg class="decor" viewBox="0 0 440 170" aria-hidden="true">
-        <defs><linearGradient id="g3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5BE7F5"/><stop offset="1" stop-color="#2F6BFF"/></linearGradient></defs>
-        <path d="M20 150C60 40 120 160 200 120C250 90 300 60 360 110" fill="none" stroke="#2F6BFF" stroke-opacity=".6"/>
-        <rect class="float" x="14" y="100" width="36" height="36" rx="9" fill="url(#g3)"/>
-        <rect class="float d2" x="170" y="104" width="44" height="44" rx="10" fill="url(#g3)"/>
-        <rect class="float d3" x="330" y="86" width="34" height="34" rx="9" fill="url(#g3)"/>
-      </svg>
-    </div>
+    <!-- pale top-left corner -->
+    <path d="M0 0H175V102Q175 162 115 162H0Z" fill="url(#gC)"/>
 
-    <div class="preview-card" aria-label="Preview of the RxGuard medication overview">
-      <p class="preview-label">Your medication companion</p>
-      <div class="preview-heading">
-        <div class="preview-icon" aria-hidden="true">✚</div>
-        <div><h2>Medication overview</h2><p>Information in one place</p></div>
-      </div>
-      <div class="preview-row"><span class="preview-check" aria-hidden="true">✓</span><div><strong>Medication information</strong><p>Review information extracted from medication images.</p></div></div>
-      <div class="preview-row"><span class="preview-check" aria-hidden="true">✓</span><div><strong>Interaction awareness</strong><p>Review potential concerns that may need professional advice.</p></div></div>
-      <div class="preview-row"><span class="preview-check" aria-hidden="true">✓</span><div><strong>Daily organisation</strong><p>Keep track of medication schedules and reminders.</p></div></div>
-    </div>
+    <!-- main blob -->
+    <path d="M450 0 L600 270 C625 320 660 372 720 392 C760 402 800 372 850 392 C905 412 925 480 900 535 C880 580 820 610 800 655 C780 700 800 740 840 792 H1403 V0 Z" fill="url(#gL)"/>
+    <path d="M650 0 L810 232 C850 272 905 268 950 244 C1000 217 1030 203 1052 205 A105 105 0 0 1 1155 312 C1150 385 1095 410 1062 432 C1030 455 1020 500 1025 520 L1200 792 H1403 V0 Z" fill="url(#gD)"/>
+    <path d="M650 0 L810 232 C850 272 905 268 950 244 C1000 217 1030 203 1052 205 A105 105 0 0 1 1155 312 C1150 385 1095 410 1062 432 C1030 455 1020 500 1025 520 L1200 792" fill="none" stroke="#FFFFFF" stroke-opacity=".75" stroke-width="1.3"/>
+
+    <!-- dashed outlines -->
+    <path d="M490 0 C520 120 600 250 725 268 C790 272 840 222 885 205 A105 105 0 0 1 995 310 C995 350 940 390 910 410 C880 430 862 480 872 545" fill="none" stroke="#EAF8FC" stroke-opacity=".75" stroke-width="1.6" stroke-dasharray="7 8"/>
+
+    <!-- translucent squares -->
+    <g fill="#FFFFFF" fill-opacity=".42" filter="url(#sh)">
+      <rect x="1090" y="427" width="80" height="80" rx="14" transform="rotate(15 1130 467)"/>
+      <rect x="1220" y="522" width="48" height="48" rx="10" transform="rotate(15 1244 546)"/>
+      <rect x="1289" y="582" width="56" height="56" rx="11" transform="rotate(15 1317 610)"/>
+      <rect x="1119" y="626" width="48" height="48" rx="10" transform="rotate(15 1143 650)"/>
+    </g>
+
+    <!-- lines -->
+    <path d="M0 248 L168 365 C190 420 150 470 110 520 C80 570 70 640 120 690 C170 735 230 728 285 685 C320 650 340 622 380 618 C400 616 415 620 425 625" fill="none" stroke="#3DB5D3" stroke-width="1.2"/>
+    <path d="M0 248 L168 365" fill="none" stroke="#1B6AA5" stroke-width="1.2"/>
+    <path d="M460 655 L615 792" fill="none" stroke="#1B6AA5" stroke-width="1.2"/>
+
+    <!-- gradient squares -->
+    <g filter="url(#sh)">
+      <rect x="102" y="354" width="88" height="88" rx="13" fill="url(#gS)"/>
+      <rect x="219" y="514" width="57" height="57" rx="11" fill="url(#gS)"/>
+      <rect x="52" y="592" width="57" height="57" rx="11" fill="url(#gS)"/>
+      <rect x="273" y="618" width="64" height="64" rx="11" fill="url(#gS)"/>
+    </g>
+  </svg>
+
+  <div class="hero-left">
+    <p class="hello">Hello, and welcome to RxGuard</p>
+    <h1>Make more informed decisions about your medication.</h1>
+    <p class="hero-copy">We're glad you're here. RxGuard helps you review medication information, understand potential interactions [when two medicines affect each other], explore food cautions, and organise your daily schedule in one friendly place.</p>
+    <p class="disclaimer">RxGuard provides informational support, not a diagnosis or a replacement for advice from a qualified healthcare professional.</p>
   </div>
+  <a class="pill-cta" href="/login"><span class="pill-arrow" aria-hidden="true"><svg viewBox="0 0 24 14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 7h21M17 2l5 5-5 5"/></svg></span><span class="label">Get Started</span></a>
 </section>
 
 <section class="section" id="features">
@@ -280,7 +278,7 @@ footer .brand{font-size:1.2rem}footer .brand-mark{width:34px;height:34px;font-si
     var dark=t==="dark";
     icon.textContent=dark?"☀":"☾"; label.textContent=dark?"Light":"Dark";
     toggle.setAttribute("aria-label",dark?"Switch to light mode":"Switch to dark mode");
-    document.querySelector('meta[name="theme-color"]').setAttribute("content",dark?"#0B132B":"#EAF8FC");
+    document.querySelector('meta[name="theme-color"]').setAttribute("content",dark?"#0B132B":"#E6F5F8");
   }
   var saved=null; try{saved=localStorage.getItem("rxguard-theme")}catch(e){}
   applyTheme(saved==="dark"?"dark":"light");
